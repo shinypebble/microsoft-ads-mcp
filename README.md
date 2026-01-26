@@ -38,7 +38,7 @@ A Model Context Protocol (MCP) server for Microsoft Advertising (Bing Ads / Duck
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/microsoft-ads-mcp-server.git
+git clone https://github.com/Duartemartins/microsoft-ads-mcp-server.git
 cd microsoft-ads-mcp-server
 
 # Install dependencies
