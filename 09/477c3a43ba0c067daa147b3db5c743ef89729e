@@ -1,0 +1,113 @@
+src/microsoft_ads_mcp/__init__.py
+  s_b76eeed047624c::t_a6446e07b6e0f6 1-3
+.python-version
+  h_f59d9e9062174a 1
+src/microsoft_ads_mcp/api/client.py
+  s_b76eeed047624c::t_c7827d34b677f9 73
+  s_b76eeed047624c::t_225a840d605dcb 76-85
+  s_b76eeed047624c::t_44cb4339ea7d9a 1-72,74-75,86-102
+scripts/ci.sh
+  s_b76eeed047624c::t_688c9efc422a44 1-7
+src/microsoft_ads_mcp/services/reporting.py
+  s_b76eeed047624c::t_918c0dec6c3a45 58-66,131,151
+  s_b76eeed047624c::t_639a6322a878de 1-57,67-130,132-150,152-179
+tests/conftest.py
+  s_b76eeed047624c::t_acb3338f456faf 1-29
+AGENTS.md
+  s_b76eeed047624c::t_86e3460e31dda8 1-4
+README.md
+  s_b76eeed047624c::t_50a878a723c0ef 1,3-6,8-10,12-13,15,17-20,22,24-30,32,35-37,42,44-52,54-55,57,59,61-63,65,72-73,75-78,85,87,89-90,92-93,95-96,98,100-116,118,120-126,128,130
+tests/test_errors.py
+  s_b76eeed047624c::t_3dff702500fa87 1-43
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_b76eeed047624c::t_55be26e284427d 1-17,19-115
+  s_b76eeed047624c::t_918c0dec6c3a45 18
+src/microsoft_ads_mcp/services/__init__.py
+  s_b76eeed047624c::t_1f27c4855e1cf9 1-27
+src/microsoft_ads_mcp/config.py
+  s_b76eeed047624c::t_4770275bb390e0 1-7,9-17,21,24,26-27,37-39,41-59
+  s_b76eeed047624c::t_96068169e2f8a0 8,18-20,22-23,25,28-36,40
+src/microsoft_ads_mcp/services/mutations.py
+  s_b76eeed047624c::t_918c0dec6c3a45 88
+  s_b76eeed047624c::t_40971fb176a84e 1-87,89-209
+src/microsoft_ads_mcp/api/auth.py
+  s_b76eeed047624c::t_18ddfba35f5eaa 1-34,36-85,87-116,118-130
+  s_b76eeed047624c::t_918c0dec6c3a45 35
+  s_b76eeed047624c::t_c7827d34b677f9 86,117
+.gitignore
+  s_b76eeed047624c::t_dffea0f5d8db8f 43-50
+CLAUDE.md
+  s_b76eeed047624c::t_a17e61bc64035f 1
+ty.toml
+  s_b76eeed047624c::t_e78468c8e68899 1-7
+  s_b76eeed047624c::t_cf042f877bc22f 8-19
+src/microsoft_ads_mcp/domain/__init__.py
+  s_b76eeed047624c::t_ac267efadf9d38 1
+tests/test_config.py
+  s_b76eeed047624c::t_5361c0dc79e116 1-21,23-32
+  s_b76eeed047624c::t_7219b9d9799dc1 22
+src/microsoft_ads_mcp/services/campaigns.py
+  s_b76eeed047624c::t_02e8e692b7c6b5 1-98
+src/microsoft_ads_mcp/tools/__init__.py
+  s_b76eeed047624c::t_1f497585367848 1-30
+skill/microsoft-ads-optimizer/SKILL.md
+  s_b76eeed047624c::t_cb16eb4984e3c2 1-40
+src/microsoft_ads_mcp/__main__.py
+  s_b76eeed047624c::t_2161020081f6b2 1-18
+src/microsoft_ads_mcp/tools/_common.py
+  s_b76eeed047624c::t_a29dfb101f105f 1-11,13-24
+  s_b76eeed047624c::t_b48438fc850180 12
+src/microsoft_ads_mcp/tools/auth_tools.py
+  s_b76eeed047624c::t_1f167c6bf8bfbf 1-34
+src/microsoft_ads_mcp/tools/read_tools.py
+  s_b76eeed047624c::t_057138088b3ed8 37-39
+  s_b76eeed047624c::t_fd24c214ed219b 1-36,40-71
+src/microsoft_ads_mcp/domain/entities.py
+  s_b76eeed047624c::t_5f4bb8df1babb5 1-168
+src/microsoft_ads_mcp/tools/reporting_tools.py
+  s_b76eeed047624c::t_4f76aa06dd57d3 1-39
+tests/test_read_only_gating.py
+  s_b76eeed047624c::t_2e3e13f2d3d03b 1-51
+pyproject.toml
+  s_b76eeed047624c::t_3fd436eb275010 43
+  s_b76eeed047624c::t_cfcf5bb296c819 50-53
+  s_b76eeed047624c::t_8f58a5cc03848f 1-5,7-42,44-49
+  s_b76eeed047624c::t_5c8e6bfd552a29 6
+src/microsoft_ads_mcp/api/__init__.py
+  s_b76eeed047624c::t_bb61bcac5bb59d 1
+src/microsoft_ads_mcp/api/errors.py
+  s_b76eeed047624c::t_68bbd778600570 1-82
+src/microsoft_ads_mcp/server.py
+  s_b76eeed047624c::t_703e0369fff1f5 5-6
+  s_b76eeed047624c::t_2e21a311d8693e 1-4,7-38,41-60,62-68
+  s_b76eeed047624c::t_e0cd8d4e42a883 39-40
+  s_b76eeed047624c::t_c7827d34b677f9 61
+.env.example
+  s_b76eeed047624c::t_013f81e759fa5b 1-33
+src/microsoft_ads_mcp/tools/health.py
+  s_b76eeed047624c::t_de2a41fe644ba2 1-12,14-42
+  s_b76eeed047624c::t_c7827d34b677f9 13
+src/microsoft_ads_mcp/services/accounts.py
+  s_b76eeed047624c::t_61dcc415ada01b 1-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "09477c3a43ba0c067daa147b3db5c743ef89729e",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_b76eeed047624c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "262cdb59-868a-40a6-b938-e2a1b49f5503",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
