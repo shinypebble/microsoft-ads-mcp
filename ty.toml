@@ -1,0 +1,19 @@
+[environment]
+python = ".venv"
+
+[src]
+# The generated msads/openapi_client package is untyped third-party code; we only
+# type-check our own package.
+include = ["src", "tests"]
+
+# The services layer constructs the SDK's OpenAPI-generated Pydantic models (Campaign,
+# AddCampaignsRequest, ...). Those models ship untyped, so ty cannot see their field-based
+# constructors or PascalCase attributes and reports false `unknown-argument` /
+# `unresolved-attribute` diagnostics. Silence just those two rules, just in the layer that
+# touches the SDK — every other module stays fully type-checked.
+[[overrides]]
+include = ["src/microsoft_ads_mcp/services/**"]
+
+[overrides.rules]
+unknown-argument = "ignore"
+unresolved-attribute = "ignore"

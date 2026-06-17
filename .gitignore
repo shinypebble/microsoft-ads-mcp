@@ -40,6 +40,14 @@ tokens.json
 *.pem
 *.key
 
+# Tooling caches / lockfile-adjacent
+.ruff_cache/
+.ty_cache/
+
+# Downloaded report/bulk working files
+*.csv.tmp
+.ms_ads_work/
+
 # OS
 .DS_Store
 Thumbs.db

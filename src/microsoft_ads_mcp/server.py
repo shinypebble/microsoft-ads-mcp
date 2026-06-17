@@ -1,0 +1,68 @@
+"""FastMCP server: builds the instance, manages the shared client, registers tools."""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastmcp import FastMCP
+
+from .api.client import MsAdsClient, set_client
+from .config import Settings, get_settings
+from .tools import register_all
+
+_INSTRUCTIONS = (
+    "Manage and report on a single Microsoft Advertising (Bing Ads) account.\n"
+    "Call `account_health` first to confirm credentials and whether writes are enabled. Use "
+    "`search_accounts` to find account ids, then `get_campaigns` / `get_ad_groups` / "
+    "`get_keywords` / `get_ads` to walk the tree, and `run_performance_report` for "
+    "performance (it downloads and parses the report for you). When writes are enabled "
+    "(READ_ONLY=false), new campaigns/ad groups/ads are created PAUSED."
+)
+
+
+def _skills_root() -> Path | None:
+    """Locate the bundled ``skill/`` directory across dev and installed layouts."""
+    here = Path(__file__).resolve()
+    candidates = (
+        here.parent / "skill",  # installed wheel: microsoft_ads_mcp/skill/
+        here.parents[2] / "skill",  # source checkout: <repo>/skill/
+    )
+    return next((p for p in candidates if p.is_dir()), None)
+
+
+def create_server(settings: Settings | None = None) -> FastMCP:
+    """Construct a fully-registered server. Write tools are gated by ``settings.read_only``."""
+    settings = settings or get_settings()
+
+    @asynccontextmanager
+    async def lifespan(_server: FastMCP) -> AsyncIterator[dict]:
+        if not settings.has_credentials:
+            raise RuntimeError(
+                "MICROSOFT_ADS_DEVELOPER_TOKEN and MICROSOFT_ADS_CLIENT_ID must be set."
+            )
+        client = MsAdsClient(settings)
+        set_client(client)
+        try:
+            yield {}
+        finally:
+            set_client(None)
+
+    mcp: FastMCP = FastMCP(name="microsoft-ads", instructions=_INSTRUCTIONS, lifespan=lifespan)
+    register_all(mcp, settings)
+
+    skills_root = _skills_root()
+    if skills_root is not None:
+        try:
+            from fastmcp.server.providers.skills import SkillsDirectoryProvider
+
+            mcp.add_provider(SkillsDirectoryProvider(roots=skills_root))
+        except Exception:
+            pass
+
+    return mcp
+
+
+# Module-level instance for `fastmcp run src/microsoft_ads_mcp/server.py:mcp`.
+mcp = create_server()

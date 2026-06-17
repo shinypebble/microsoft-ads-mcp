@@ -1,213 +1,130 @@
-# Microsoft Ads MCP Server
+# microsoft-ads-mcp
 
-A Model Context Protocol (MCP) server for Microsoft Advertising (Bing Ads / DuckDuckGo Ads). This server enables AI assistants to create, manage, and report on Microsoft Advertising campaigns programmatically.
+An MCP server for the **Microsoft Advertising (Bing Ads) REST API**, built for agent-led
+campaign management and reporting. It exposes a focused set of *useful-work* tools — walk the
+campaign tree, add keywords/ads, manage budgets and status, and pull performance reports that
+are actually downloaded and parsed for you — rather than a 1:1 mirror of the API surface.
 
-## Features
+Built with [FastMCP](https://gofastmcp.com) and the official Microsoft
+[`msads`](https://pypi.org/project/msads/) REST SDK (which ships OpenAPI-generated **Pydantic
+v2** models). Managed with `uv`, linted/formatted with `ruff`, type-checked with `ty`.
 
-### Authentication
-- OAuth 2.0 authentication flow with token persistence
-- Automatic token refresh
+> This is a ground-up rewrite of the original single-file `server.py`, restructured to mirror
+> the architecture of its sibling project `openai-ads-mcp`.
 
-### Campaign Management
-- **Campaigns**: Create, list, pause/activate search campaigns
-- **Ad Groups**: Create and list ad groups within campaigns
-- **Keywords**: Add keywords with Broad, Phrase, or Exact match types
-- **Ads**: Create Responsive Search Ads (RSAs) with multiple headlines and descriptions
+## Why REST / `msads` (not the legacy SOAP `bingads` SDK)
 
-### Reporting
-- Campaign performance reports
-- Keyword performance reports
-- Search query reports (actual search terms)
-- Geographic performance reports
-- Async report generation with polling
+Microsoft is retiring the SOAP API: **new features are REST-only from Oct 1, 2026**, and SOAP
+is **fully deprecated on Jan 31, 2027** ([migration guide](https://learn.microsoft.com/en-us/advertising/guides/migrate-to-rest?view=bingads-13)).
+The REST SDK `msads` gives typed Pydantic models, structured HTTP exceptions, and the same
+OAuth/`ServiceClient` entry points — so this server is built on it directly.
 
-### Account Management
-- List all accessible accounts
-- View campaign budgets
-- Label management
+### SDK quirks worth knowing
 
-## Prerequisites
+- **`msads` is synchronous** (requests/urllib3). Tools here are therefore plain sync
+  functions; FastMCP runs them in a worker thread, so the event loop is never blocked. We do
+  not wrap the SDK in async.
+- **`msads` does not declare its `python-dateutil` dependency**, even though
+  `openapi_client` imports it. We pin `python-dateutil` explicitly in `pyproject.toml`.
+- The package installs as the `bingads.*` (auth + `ServiceClient`) and `openapi_client.*`
+  (models + exceptions) import namespaces — there is no top-level `msads` module.
 
-1. **Microsoft Advertising Account**: Sign up at [ads.microsoft.com](https://ads.microsoft.com)
-2. **Developer Token**: Apply at [Microsoft Advertising Developer Portal](https://developers.ads.microsoft.com/)
-3. **Azure AD App Registration**: Create an app in [Azure Portal](https://portal.azure.com) with:
-   - Redirect URI: `https://login.microsoftonline.com/common/oauth2/nativeclient`
-   - API permissions: Microsoft Advertising API
-
-## Installation
+## Quickstart
 
 ```bash
-# Clone the repository
-git clone https://github.com/Duartemartins/microsoft-ads-mcp-server.git
-cd microsoft-ads-mcp-server
-
-# Install dependencies
-pip install -r requirements.txt
+uv sync                              # create .venv and install
+cp .env.example .env                 # then set the credentials below
+uv run python -m microsoft_ads_mcp   # run over stdio (default)
 ```
 
 ## Configuration
 
-### Environment Variables
+Set via environment variables or a local `.env` (see [.env.example](.env.example)):
 
-Create a `.env` file or set these environment variables:
+| Variable | Required | Notes |
+|---|---|---|
+| `MICROSOFT_ADS_DEVELOPER_TOKEN` | yes | From the developer portal |
+| `MICROSOFT_ADS_CLIENT_ID` | yes | Azure AD app (client) id |
+| `MICROSOFT_ADS_REFRESH_TOKEN` | recommended | Run non-interactively; else mint one via the auth tools |
+| `MICROSOFT_ADS_CLIENT_SECRET` | no | Only for web/confidential app registrations |
+| `MICROSOFT_ADS_ACCOUNT_ID` / `MICROSOFT_ADS_CUSTOMER_ID` | no | Discovered via `search_accounts` if unset |
+| `MICROSOFT_ADS_ENVIRONMENT` | no | `production` (default) or `sandbox` |
+| `READ_ONLY` | no | `true` registers no write tools at all (default `false`) |
 
-```bash
-MICROSOFT_ADS_DEVELOPER_TOKEN=your_developer_token
-MICROSOFT_ADS_CLIENT_ID=your_azure_app_client_id
-MICROSOFT_ADS_CUSTOMER_ID=your_customer_id      # Optional, discovered during auth
-MICROSOFT_ADS_ACCOUNT_ID=your_account_id        # Optional, discovered during auth
-```
+Refresh tokens are persisted to `~/.config/microsoft-ads/tokens.json`, created with `0600`
+permissions (owner read/write only).
 
-### Token Storage
+## Authentication
 
-Tokens are stored in `~/.config/microsoft-ads/tokens.json` after authentication.
+If you have no refresh token yet, mint one once (interactive):
 
-## Usage
+1. Call `get_auth_url()` → open the URL, sign in.
+2. Copy the redirect URL and call `complete_auth(redirect_url)`.
+3. The refresh token is saved and reused/auto-refreshed thereafter.
 
-### With Claude Code / mcporter
-
-Add to your `~/.mcporter/mcporter.json`:
+## MCP client configuration
 
 ```json
 {
   "mcpServers": {
     "microsoft-ads": {
-      "command": "python3",
-      "args": ["/path/to/microsoft-ads-mcp-server/server.py"],
       "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--directory", "${CLAUDE_PROJECT_DIR:-.}", "python", "-m", "microsoft_ads_mcp"],
       "env": {
-        "MICROSOFT_ADS_DEVELOPER_TOKEN": "your_token",
-        "MICROSOFT_ADS_CLIENT_ID": "your_client_id"
+        "MICROSOFT_ADS_DEVELOPER_TOKEN": "...",
+        "MICROSOFT_ADS_CLIENT_ID": "...",
+        "MICROSOFT_ADS_REFRESH_TOKEN": "...",
+        "READ_ONLY": "false"
       }
     }
   }
 }
 ```
 
-### Standalone
+## Tools
+
+Call `account_health` first to validate credentials and learn whether writes are enabled.
+
+**Read** — `account_health`, `search_accounts`, `account_overview`, `get_campaigns`,
+`get_ad_groups`, `get_keywords`, `get_ads`, `get_budgets`.
+
+**Reporting** — `run_performance_report` (submit → poll → download → parse, returns rows),
+covering campaign / keyword / search-query / geographic reports.
+
+**Write** (only when `READ_ONLY=false`) — `create_campaign`, `update_campaign_status`,
+`create_ad_group`, `add_keywords`, `create_responsive_search_ad`.
+
+## Architecture
+
+```
+src/microsoft_ads_mcp/
+  config.py            # pydantic-settings; all env config
+  server.py            # builds FastMCP, lifespan-manages the client, registers tools
+  api/
+    auth.py            # OAuth flow + hardened token store
+    client.py          # wraps msads ServiceClient(s); the single dispatch point
+    errors.py          # translate openapi_client exceptions -> MsAdsApiError
+  domain/
+    entities.py        # lean Pydantic summary/report models for tool outputs
+  services/
+    campaigns.py       # hierarchy + list reads
+    mutations.py       # create/update flows
+    reporting.py       # submit/poll/download/parse
+  tools/
+    health.py read_tools.py write_tools.py reporting_tools.py  # registered, READ_ONLY-gated
+```
+
+## Development
 
 ```bash
-python server.py
+uv run ruff check . && uv run ruff format --check .
+uv run ty check
+uv run pytest -q
+# or all at once:
+bash scripts/ci.sh
 ```
-
-## Authentication Flow
-
-1. Call `get_auth_url()` to get the OAuth URL
-2. Open the URL in a browser and sign in with your Microsoft account
-3. After authorization, copy the redirect URL (starts with `https://login.microsoftonline.com/common/oauth2/nativeclient?code=...`)
-4. Call `complete_auth(redirect_url)` with the full redirect URL
-5. Your tokens are now saved and will auto-refresh
-
-## Available Tools
-
-### Authentication
-| Tool | Description |
-|------|-------------|
-| `get_auth_url()` | Get OAuth URL for sign-in |
-| `complete_auth(redirect_url)` | Complete OAuth with redirect URL |
-
-### Accounts
-| Tool | Description |
-|------|-------------|
-| `search_accounts()` | List all accessible advertising accounts |
-
-### Campaigns
-| Tool | Description |
-|------|-------------|
-| `get_campaigns(include_deleted?)` | List all campaigns |
-| `create_campaign(name, daily_budget, description?)` | Create a search campaign (paused by default) |
-| `update_campaign_status(campaign_id, status)` | Set campaign to Active or Paused |
-
-### Ad Groups
-| Tool | Description |
-|------|-------------|
-| `get_ad_groups(campaign_id)` | List ad groups in a campaign |
-| `create_ad_group(campaign_id, name, cpc_bid?)` | Create an ad group |
-
-### Keywords
-| Tool | Description |
-|------|-------------|
-| `get_keywords(ad_group_id)` | List keywords in an ad group |
-| `add_keywords(ad_group_id, keywords, match_type?, default_bid?)` | Add keywords (comma-separated) |
-
-### Ads
-| Tool | Description |
-|------|-------------|
-| `get_ads(ad_group_id)` | List ads in an ad group |
-| `create_responsive_search_ad(ad_group_id, final_url, headlines, descriptions, path1?, path2?)` | Create an RSA |
-
-### Reporting
-| Tool | Description |
-|------|-------------|
-| `submit_campaign_performance_report(date_range?, columns?)` | Submit campaign report request |
-| `submit_keyword_performance_report(date_range?, columns?)` | Submit keyword report request |
-| `submit_search_query_report(date_range?, columns?)` | Submit search terms report request |
-| `submit_geographic_report(date_range?, columns?)` | Submit geo report request |
-| `poll_report_status(report_id?)` | Check report status and get download URL |
-
-### Other
-| Tool | Description |
-|------|-------------|
-| `get_budgets()` | View campaign budgets |
-| `get_labels(label_ids?)` | Get label information |
-
-## Example Workflow
-
-```python
-# 1. Authenticate (first time only)
-get_auth_url()
-# Open URL in browser, sign in, copy redirect URL
-complete_auth("https://login.microsoftonline.com/common/oauth2/nativeclient?code=...")
-
-# 2. Check your account
-search_accounts()
-
-# 3. Create a campaign
-create_campaign(name="My Search Campaign", daily_budget=20)
-
-# 4. Create an ad group
-create_ad_group(campaign_id=123456, name="Product Keywords", cpc_bid=1.50)
-
-# 5. Add keywords
-add_keywords(
-    ad_group_id=789012,
-    keywords="buy widgets, widget store, best widgets",
-    match_type="Phrase",
-    default_bid=1.25
-)
-
-# 6. Create an ad
-create_responsive_search_ad(
-    ad_group_id=789012,
-    final_url="https://example.com/widgets",
-    headlines="Buy Widgets Online|Best Widget Store|Free Shipping on Widgets",
-    descriptions="Shop our huge selection of widgets. Free shipping on orders over $50.|Quality widgets at great prices. Order today!"
-)
-
-# 7. Activate the campaign
-update_campaign_status(campaign_id=123456, status="Active")
-
-# 8. Check performance later
-submit_campaign_performance_report(date_range="LastWeek")
-poll_report_status()
-```
-
-## Why Microsoft Advertising?
-
-- **DuckDuckGo Integration**: Microsoft Advertising powers DuckDuckGo search ads, reaching privacy-conscious users
-- **Lower CPCs**: Often 30-50% cheaper than Google Ads for similar keywords
-- **Bing + Yahoo + AOL**: Access to the Microsoft Search Network
-- **Import from Google**: Easy migration of existing Google Ads campaigns
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Acknowledgments
-
-- Built with [FastMCP](https://github.com/jlowin/fastmcp)
-- Uses the [Bing Ads Python SDK](https://github.com/BingAds/BingAds-Python-SDK)
+MIT — see [LICENSE](LICENSE).
