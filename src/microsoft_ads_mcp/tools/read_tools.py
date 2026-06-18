@@ -10,12 +10,19 @@ from mcp.types import ToolAnnotations
 from ..api.client import get_client
 from ..domain.entities import (
     AccountSummary,
+    AdExtensionSummary,
     AdGroupSummary,
     AdSummary,
     CampaignSummary,
+    ConversionGoalSummary,
     KeywordSummary,
+    LocationCriterionSummary,
+    NegativeEntityType,
+    NegativeKeywordSummary,
+    PostalCodeLocation,
+    UetTagSummary,
 )
-from ..services import accounts, campaigns
+from ..services import accounts, bulk, campaigns, conversions, criteria, extensions, geo, negatives
 from ._common import guarded
 
 _READ = ToolAnnotations(readOnlyHint=True)
@@ -69,3 +76,126 @@ def register(mcp: FastMCP) -> None:
     def get_budgets() -> list[dict[str, Any]]:
         """Per-campaign budget view (daily budget and any shared-budget id)."""
         return guarded(lambda: campaigns.get_budgets(get_client()))
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_negative_keywords(
+        entity_ids: list[str],
+        entity_type: NegativeEntityType = "Campaign",
+        parent_entity_id: str | None = None,
+    ) -> list[NegativeKeywordSummary]:
+        """List negative keywords attached to campaigns or ad groups.
+
+        Args:
+            entity_ids: Campaign ids (or ad group ids) to read negatives from.
+            entity_type: "Campaign" or "AdGroup" (default "Campaign").
+            parent_entity_id: For entity_type "AdGroup", the parent campaign id (required).
+        """
+        return guarded(
+            lambda: negatives.get_negative_keywords(
+                get_client(),
+                entity_ids=entity_ids,
+                entity_type=entity_type,
+                parent_entity_id=parent_entity_id,
+            )
+        )
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_ad_extensions(
+        extension_types: list[str] | None = None,
+        association_type: str = "Account",
+    ) -> list[AdExtensionSummary]:
+        """List ad extensions in the account (call, callout, sitelink, etc.).
+
+        Args:
+            extension_types: Optional filter, e.g. ["Call", "Sitelink"]; defaults to all types.
+            association_type: Scope to enumerate ids from: "Account", "Campaign", or "AdGroup"
+                (default "Account").
+        """
+        return guarded(
+            lambda: extensions.get_ad_extensions(
+                get_client(),
+                extension_types=extension_types,
+                association_type=association_type,
+            )
+        )
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_conversion_goals(goal_ids: list[str] | None = None) -> list[ConversionGoalSummary]:
+        """List conversion goals (all types). Pass goal_ids to fetch specific goals.
+
+        Args:
+            goal_ids: Optional conversion goal ids; omit to list all goals in the account.
+        """
+        return guarded(lambda: conversions.get_conversion_goals(get_client(), goal_ids=goal_ids))
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_uet_tags(tag_ids: list[str] | None = None) -> list[UetTagSummary]:
+        """List UET tags. Pass tag_ids to fetch specific tags.
+
+        Args:
+            tag_ids: Optional UET tag ids; omit to list all tags in the account.
+        """
+        return guarded(lambda: conversions.get_uet_tags(get_client(), tag_ids=tag_ids))
+
+    @mcp.tool(tags={"read"}, annotations=ToolAnnotations(readOnlyHint=False))
+    def set_active_account(account_id: str, customer_id: str | None = None) -> dict[str, str]:
+        """Switch which account subsequent tool calls read from and write to (this session only).
+
+        Use search_accounts to find ids. The OAuth credential is unchanged; this only rescopes
+        calls. Confirm the target with account_health afterwards before any write.
+
+        Args:
+            account_id: The advertising account id to make active.
+            customer_id: Optional manager (customer) id that owns the account.
+        """
+
+        def _switch() -> dict[str, str]:
+            client = get_client()
+            client.set_account(account_id, customer_id)
+            return {
+                "account_id": str(client.account_id),
+                "customer_id": str(client.customer_id) if client.customer_id else "",
+                "message": f"Active account set to {account_id}",
+            }
+
+        return guarded(_switch)
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_location_targets(campaign_id: str) -> list[LocationCriterionSummary]:
+        """List the location targets/exclusions on a campaign.
+
+        Args:
+            campaign_id: The campaign id.
+        """
+        return guarded(lambda: criteria.get_location_targets(get_client(), campaign_id=campaign_id))
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def resolve_postal_codes(
+        postal_codes: list[str], language_locale: str = "en"
+    ) -> list[PostalCodeLocation]:
+        """Resolve ZIP / postal codes to Microsoft LocationIds (for location targeting).
+
+        Downloads and caches Microsoft's geo-locations file on first use.
+
+        Args:
+            postal_codes: ZIP / postal codes to resolve, e.g. ["98101", "98052"].
+            language_locale: Geo file locale (default "en").
+        """
+        return guarded(
+            lambda: geo.resolve_postal_codes(
+                get_client(), postal_codes=postal_codes, language_locale=language_locale
+            )
+        )
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def bulk_download(entities: list[str] | None = None) -> dict[str, Any]:
+        """Export the account to a Bulk file; returns the result file URL when ready.
+
+        Submits a Bulk download and polls to completion (the file can be large, so the URL is
+        returned rather than the contents).
+
+        Args:
+            entities: Entity types to include, e.g. ["Campaigns", "AdGroups", "Ads", "Keywords"]
+                (the default set).
+        """
+        return guarded(lambda: bulk.bulk_download(get_client(), entities=entities))

@@ -2,8 +2,10 @@
 
 An MCP server for the **Microsoft Advertising (Bing Ads) REST API**, built for agent-led
 campaign management and reporting. It exposes a focused set of *useful-work* tools — walk the
-campaign tree, add keywords/ads, manage budgets and status, and pull performance reports that
-are actually downloaded and parsed for you — rather than a 1:1 mirror of the API surface.
+campaign tree, create **and edit in place** (rename, repoint Final URLs, tracking templates,
+status, bids), manage negative keywords, ad extensions, conversion goals/UET tags, and ZIP
+location targeting, run the Bulk API, and pull performance reports that are actually downloaded
+and parsed for you — rather than a 1:1 mirror of the API surface.
 
 Built with [FastMCP](https://gofastmcp.com) and the official Microsoft
 [`msads`](https://pypi.org/project/msads/) REST SDK (which ships OpenAPI-generated **Pydantic
@@ -101,16 +103,40 @@ If you have no refresh token yet, mint one once (interactive):
 
 ## Tools
 
-Call `account_health` first to validate credentials and learn whether writes are enabled.
+Call `account_health` first to validate credentials and learn whether writes are enabled. It
+returns a discriminated `auth_state` (`ok` / `no_token` / `token_expired` / `token_rejected` /
+`dev_token_missing` / `account_inactive`) and `needs_interactive_auth`, so a client can branch
+deterministically instead of pattern-matching an error string.
 
-**Read** — `account_health`, `search_accounts`, `account_overview`, `get_campaigns`,
-`get_ad_groups`, `get_keywords`, `get_ads`, `get_budgets`.
+**Auth** — `get_auth_url`, `complete_auth` (one-time interactive sign-in; see below).
+
+**Read** — `account_health`, `search_accounts`, `set_active_account` (switch which account
+calls hit), `get_campaigns`, `get_ad_groups`, `get_keywords`, `get_ads` (includes the RSA copy:
+headlines / descriptions / paths), `get_budgets`, `get_negative_keywords`, `get_ad_extensions`,
+`get_conversion_goals`, `get_uet_tags`, `get_location_targets`, `resolve_postal_codes`
+(ZIP → Microsoft LocationId), `bulk_download`.
 
 **Reporting** — `run_performance_report` (submit → poll → download → parse, returns rows),
-covering campaign / keyword / search-query / geographic reports.
+covering campaign / keyword / search-query / geographic reports. Supports a predefined
+`date_range` or a custom `start_date`/`end_date`, and scoping to a single `campaign_id` /
+`ad_group_id` / `account_id`.
 
-**Write** (only when `READ_ONLY=false`) — `create_campaign`, `update_campaign_status`,
-`create_ad_group`, `add_keywords`, `create_responsive_search_ad`.
+**Write** (only when `READ_ONLY=false`) — new campaigns / ad groups / ads are created **PAUSED**.
+
+- *Campaigns, ad groups, ads, keywords* — `create_campaign`, `update_campaign`,
+  `update_campaign_status`, `create_ad_group`, `update_ad_group`, `create_responsive_search_ad`,
+  `update_responsive_search_ad`, `add_keywords`, `update_keyword`, `delete_campaign`,
+  `delete_ad_group`, `delete_ad`, `delete_keyword`. Create/update accept `tracking_url_template`
+  and `final_url_suffix`.
+- *Negative keywords* — `add_negative_keywords`, `remove_negative_keywords` (campaign or ad-group
+  scope).
+- *Ad extensions* — `update_call_extension`, `add_callout_extension`, `add_sitelink_extension`.
+- *Conversion goals / UET tags* — `update_conversion_goal`, `update_uet_tag`.
+- *Location (ZIP/geo) targeting* — `add_location_targets`, `remove_location_targets`.
+- *Bulk API* — `bulk_upload`.
+
+The `update_*` tools patch in place: only the fields you pass change. Prefer them over
+recreate-and-pause when an entity already exists.
 
 ## Architecture
 
@@ -125,11 +151,18 @@ src/microsoft_ads_mcp/
   domain/
     entities.py        # lean Pydantic summary/report models for tool outputs
   services/
+    accounts.py        # user/account reads (CustomerManagementService)
     campaigns.py       # hierarchy + list reads
-    mutations.py       # create/update flows
+    mutations.py       # create/update/delete for campaigns, ad groups, ads, keywords
+    negatives.py       # negative-keyword add/list/remove
+    extensions.py      # ad extensions (call/callout/sitelink)
+    conversions.py     # conversion goals + UET tags
+    criteria.py        # location (ZIP/geo) targeting via campaign criterions
+    geo.py             # ZIP -> LocationId resolution (cached geo-locations file)
+    bulk.py            # Bulk API upload/download (submit/poll)
     reporting.py       # submit/poll/download/parse
   tools/
-    health.py read_tools.py write_tools.py reporting_tools.py  # registered, READ_ONLY-gated
+    health.py read_tools.py write_tools.py reporting_tools.py auth_tools.py  # READ_ONLY-gated
 ```
 
 ## Development

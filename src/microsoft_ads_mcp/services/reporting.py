@@ -20,9 +20,12 @@ from openapi_client.models.reporting.account_through_ad_group_report_scope impor
 from openapi_client.models.reporting.account_through_campaign_report_scope import (
     AccountThroughCampaignReportScope,
 )
+from openapi_client.models.reporting.ad_group_report_scope import AdGroupReportScope
 from openapi_client.models.reporting.campaign_performance_report_request import (
     CampaignPerformanceReportRequest,
 )
+from openapi_client.models.reporting.campaign_report_scope import CampaignReportScope
+from openapi_client.models.reporting.date import Date
 from openapi_client.models.reporting.geographic_performance_report_request import (
     GeographicPerformanceReportRequest,
 )
@@ -86,25 +89,39 @@ def run_performance_report(
     report_type: str,
     date_range: str = "LastMonth",
     columns: list[str] | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    account_id: str | None = None,
+    campaign_id: str | None = None,
+    ad_group_id: str | None = None,
     poll_interval_seconds: float = 5.0,
     timeout_seconds: float = 180.0,
 ) -> ReportResult:
-    """Submit a report, poll until ready, download the CSV, and return parsed rows."""
+    """Submit a report, poll until ready, download the CSV, and return parsed rows.
+
+    Time window: a ``start_date``/``end_date`` pair (each ``YYYY-MM-DD``) takes precedence over
+    the predefined ``date_range``. Scope: ``campaign_id`` / ``ad_group_id`` narrow the report to
+    one entity; otherwise the whole account (``account_id`` or the configured one) is reported.
+    """
     if report_type not in _REPORTS:
         raise ValueError(f"report_type must be one of {', '.join(REPORT_TYPES)}")
     request_cls, scope_cls, default_cols = _REPORTS[report_type]
     cols = columns or default_cols
+    account = str(account_id or client.account_id)
 
-    scope = scope_cls(account_ids=[client.account_id])
+    scope = _build_scope(
+        scope_cls, account=account, campaign_id=campaign_id, ad_group_id=ad_group_id
+    )
+    time, window_label = _build_time(date_range, start_date, end_date)
     report_request = request_cls(
         format="Csv",
-        report_name=f"{report_type} {date_range}",
+        report_name=f"{report_type} {window_label}",
         return_only_complete_data=False,
         exclude_report_header=True,
         exclude_report_footer=True,
         exclude_column_headers=False,
         scope=scope,
-        time=ReportTime(predefined_time=date_range),
+        time=time,
         columns=cols,
     )
 
@@ -121,11 +138,59 @@ def run_performance_report(
     columns_out, rows = _download_and_parse(download_url)
     return ReportResult(
         report_type=report_type,
-        date_range=date_range,
+        date_range=window_label,
         columns=columns_out or cols,
         row_count=len(rows),
         rows=[ReportRow(values=r) for r in rows],
     )
+
+
+def _build_scope(
+    scope_cls: type,
+    *,
+    account: str,
+    campaign_id: str | None,
+    ad_group_id: str | None,
+) -> Any:
+    """Narrow the report to one ad group or campaign, else the whole account."""
+    if ad_group_id is not None:
+        if "ad_groups" not in scope_cls.model_fields:
+            raise ValueError(
+                "ad_group_id filtering needs report_type 'keyword', 'search_query', or "
+                "'geographic'"
+            )
+        scope_kwargs: dict[str, Any] = {"account_id": account, "ad_group_id": str(ad_group_id)}
+        if campaign_id is not None:
+            scope_kwargs["campaign_id"] = str(campaign_id)
+        return scope_cls(ad_groups=[AdGroupReportScope(**scope_kwargs)])
+    if campaign_id is not None:
+        return scope_cls(
+            campaigns=[CampaignReportScope(account_id=account, campaign_id=str(campaign_id))]
+        )
+    return scope_cls(account_ids=[account])
+
+
+def _build_time(
+    date_range: str, start_date: str | None, end_date: str | None
+) -> tuple[ReportTime, str]:
+    """Custom YYYY-MM-DD range when both bounds are given, else the predefined range."""
+    if start_date or end_date:
+        if not (start_date and end_date):
+            raise ValueError("provide both start_date and end_date for a custom range")
+        time = ReportTime(
+            custom_date_range_start=_to_date(start_date),
+            custom_date_range_end=_to_date(end_date),
+        )
+        return time, f"{start_date}..{end_date}"
+    return ReportTime(predefined_time=date_range), date_range
+
+
+def _to_date(value: str) -> Date:
+    parts = value.split("-")
+    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+        raise ValueError(f"date must be YYYY-MM-DD, got {value!r}")
+    year, month, day = (int(p) for p in parts)
+    return Date(year=year, month=month, day=day)
 
 
 def _poll(client: MsAdsClient, request_id: Any, interval: float, timeout: float) -> str:

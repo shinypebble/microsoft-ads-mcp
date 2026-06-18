@@ -53,6 +53,22 @@ class MsAdsClient:
     def account_id(self) -> Any:
         return self.authorization().account_id
 
+    @property
+    def customer_id(self) -> Any:
+        return self.authorization().customer_id
+
+    def set_account(self, account_id: str, customer_id: str | None = None) -> None:
+        """Switch the active account (and optionally customer) for subsequent calls.
+
+        Mutates the cached ``AuthorizationData`` in place and drops the per-service client cache
+        so the next call binds to the new scope. The OAuth credential is unchanged.
+        """
+        auth = self.authorization()
+        auth.account_id = account_id
+        if customer_id is not None:
+            auth.customer_id = customer_id
+        self._services.clear()
+
     def service(self, name: str) -> ServiceClient:
         """Return a cached ServiceClient for ``name`` (e.g. ``CAMPAIGN``)."""
         svc = self._services.get(name)

@@ -16,11 +16,18 @@ from openapi_client.models.campaign.add_keywords_request import AddKeywordsReque
 from openapi_client.models.campaign.asset_link import AssetLink
 from openapi_client.models.campaign.bid import Bid
 from openapi_client.models.campaign.campaign import Campaign
+from openapi_client.models.campaign.delete_ad_groups_request import DeleteAdGroupsRequest
+from openapi_client.models.campaign.delete_ads_request import DeleteAdsRequest
+from openapi_client.models.campaign.delete_campaigns_request import DeleteCampaignsRequest
+from openapi_client.models.campaign.delete_keywords_request import DeleteKeywordsRequest
 from openapi_client.models.campaign.get_campaigns_by_ids_request import GetCampaignsByIdsRequest
 from openapi_client.models.campaign.keyword import Keyword
 from openapi_client.models.campaign.responsive_search_ad import ResponsiveSearchAd
 from openapi_client.models.campaign.text_asset import TextAsset
+from openapi_client.models.campaign.update_ad_groups_request import UpdateAdGroupsRequest
+from openapi_client.models.campaign.update_ads_request import UpdateAdsRequest
 from openapi_client.models.campaign.update_campaigns_request import UpdateCampaignsRequest
+from openapi_client.models.campaign.update_keywords_request import UpdateKeywordsRequest
 
 from ..api.client import CAMPAIGN, MsAdsClient
 from ..domain.entities import MatchType, MutationResult
@@ -43,8 +50,30 @@ def _ids(resp: Any, *names: str) -> list[str]:
     return [str(i) for i in items if i is not None]
 
 
+def _present(**fields: Any) -> dict[str, Any]:
+    """Keep only the fields the caller actually set.
+
+    Partial updates send the id plus the changed fields only; the SDK serializes with
+    ``exclude_none=True``, so an unset (``None``) field is omitted from the request entirely.
+    Re-submitting a fully fetched entity makes the update endpoint reject round-tripped
+    read-only fields (e.g. ``IsPolitical``), so we never do that.
+    """
+    return {k: v for k, v in fields.items() if v is not None}
+
+
+def _validate_status(status: str | None) -> None:
+    if status is not None and status not in ("Active", "Paused"):
+        raise ValueError("status must be 'Active' or 'Paused'")
+
+
 def create_campaign(
-    client: MsAdsClient, *, name: str, daily_budget: float, description: str = ""
+    client: MsAdsClient,
+    *,
+    name: str,
+    daily_budget: float,
+    description: str = "",
+    tracking_url_template: str | None = None,
+    final_url_suffix: str | None = None,
 ) -> MutationResult:
     """Create a paused Search campaign with a daily budget."""
     campaign = Campaign(
@@ -55,6 +84,9 @@ def create_campaign(
         status="Paused",
         time_zone="EasternTimeUSCanada",
         campaign_type="Search",
+        **_present(
+            tracking_url_template=tracking_url_template, final_url_suffix=final_url_suffix
+        ),
     )
     resp = client.call(
         CAMPAIGN,
@@ -113,13 +145,23 @@ def create_ad_group(
     name: str,
     cpc_bid: float = 1.0,
     language: str = "English",
+    tracking_url_template: str | None = None,
+    final_url_suffix: str | None = None,
 ) -> MutationResult:
     """Create a paused ad group with a default CPC bid.
 
     ``language`` is required by Microsoft Advertising (error 1257
     ``CampaignServiceMissingLanguage`` otherwise); it defaults to English.
     """
-    ad_group = AdGroup(name=name, status="Paused", cpc_bid=Bid(amount=cpc_bid), language=language)
+    ad_group = AdGroup(
+        name=name,
+        status="Paused",
+        cpc_bid=Bid(amount=cpc_bid),
+        language=language,
+        **_present(
+            tracking_url_template=tracking_url_template, final_url_suffix=final_url_suffix
+        ),
+    )
     resp = client.call(
         CAMPAIGN,
         "add_ad_groups",
@@ -176,6 +218,8 @@ def create_responsive_search_ad(
     descriptions: list[str],
     path1: str = "",
     path2: str = "",
+    tracking_url_template: str | None = None,
+    final_url_suffix: str | None = None,
 ) -> MutationResult:
     """Create a paused Responsive Search Ad (RSA)."""
     ad = ResponsiveSearchAd(
@@ -184,6 +228,9 @@ def create_responsive_search_ad(
         final_urls=[final_url],
         headlines=[_asset_link(h[:30]) for h in headlines[:15]],
         descriptions=[_asset_link(d[:90]) for d in descriptions[:4]],
+        **_present(
+            tracking_url_template=tracking_url_template, final_url_suffix=final_url_suffix
+        ),
     )
     if path1:
         ad.Path1 = path1[:15]
@@ -201,6 +248,212 @@ def create_responsive_search_ad(
             else "RSA create failed"
         ),
         ids=ids,
+        partial_errors=errors,
+    )
+
+
+def update_campaign(
+    client: MsAdsClient,
+    *,
+    campaign_id: str,
+    name: str | None = None,
+    daily_budget: float | None = None,
+    status: str | None = None,
+    bid_strategy_id: str | None = None,
+    tracking_url_template: str | None = None,
+    final_url_suffix: str | None = None,
+) -> MutationResult:
+    """Update an existing campaign in place; only the fields you pass change."""
+    _validate_status(status)
+    campaign = Campaign(
+        id=campaign_id,
+        **_present(
+            name=name,
+            daily_budget=daily_budget,
+            status=status,
+            bid_strategy_id=bid_strategy_id,
+            tracking_url_template=tracking_url_template,
+            final_url_suffix=final_url_suffix,
+        ),
+    )
+    resp = client.call(
+        CAMPAIGN,
+        "update_campaigns",
+        UpdateCampaignsRequest(account_id=client.account_id, campaigns=[campaign]),
+    )
+    errors = _partial_errors(resp)
+    return MutationResult(
+        ok=not errors,
+        message=f"Campaign {campaign_id} updated" if not errors else "Update failed",
+        ids=[str(campaign_id)],
+        partial_errors=errors,
+    )
+
+
+def update_ad_group(
+    client: MsAdsClient,
+    *,
+    campaign_id: str,
+    ad_group_id: str,
+    name: str | None = None,
+    status: str | None = None,
+    cpc_bid: float | None = None,
+    tracking_url_template: str | None = None,
+    final_url_suffix: str | None = None,
+) -> MutationResult:
+    """Update an existing ad group in place (Microsoft requires the parent ``campaign_id``)."""
+    _validate_status(status)
+    fields = _present(
+        name=name,
+        status=status,
+        tracking_url_template=tracking_url_template,
+        final_url_suffix=final_url_suffix,
+    )
+    if cpc_bid is not None:
+        fields["cpc_bid"] = Bid(amount=cpc_bid)
+    ad_group = AdGroup(id=ad_group_id, **fields)
+    resp = client.call(
+        CAMPAIGN,
+        "update_ad_groups",
+        UpdateAdGroupsRequest(campaign_id=campaign_id, ad_groups=[ad_group]),
+    )
+    errors = _partial_errors(resp)
+    return MutationResult(
+        ok=not errors,
+        message=f"Ad group {ad_group_id} updated" if not errors else "Update failed",
+        ids=[str(ad_group_id)],
+        partial_errors=errors,
+    )
+
+
+def update_responsive_search_ad(
+    client: MsAdsClient,
+    *,
+    ad_group_id: str,
+    ad_id: str,
+    final_url: str | None = None,
+    headlines: list[str] | None = None,
+    descriptions: list[str] | None = None,
+    path1: str | None = None,
+    path2: str | None = None,
+    status: str | None = None,
+    tracking_url_template: str | None = None,
+    final_url_suffix: str | None = None,
+) -> MutationResult:
+    """Repoint/refresh an existing RSA in place; only the fields you pass change.
+
+    ``final_url`` is re-sent as a single-item list, and the ``ResponsiveSearch`` type
+    discriminator is required so the polymorphic update can dispatch.
+    """
+    _validate_status(status)
+    fields = _present(
+        status=status,
+        path1=path1[:15] if path1 is not None else None,
+        path2=path2[:15] if path2 is not None else None,
+        tracking_url_template=tracking_url_template,
+        final_url_suffix=final_url_suffix,
+    )
+    if final_url is not None:
+        fields["final_urls"] = [final_url]
+    if headlines is not None:
+        fields["headlines"] = [_asset_link(h[:30]) for h in headlines[:15]]
+    if descriptions is not None:
+        fields["descriptions"] = [_asset_link(d[:90]) for d in descriptions[:4]]
+    ad = ResponsiveSearchAd(id=ad_id, type="ResponsiveSearch", **fields)
+    resp = client.call(
+        CAMPAIGN, "update_ads", UpdateAdsRequest(ad_group_id=ad_group_id, ads=[ad])
+    )
+    errors = _partial_errors(resp)
+    return MutationResult(
+        ok=not errors,
+        message=f"Ad {ad_id} updated" if not errors else "Update failed",
+        ids=[str(ad_id)],
+        partial_errors=errors,
+    )
+
+
+def update_keyword(
+    client: MsAdsClient,
+    *,
+    ad_group_id: str,
+    keyword_id: str,
+    bid: float | None = None,
+    match_type: MatchType | None = None,
+    status: str | None = None,
+    final_url: str | None = None,
+) -> MutationResult:
+    """Update an existing keyword in place (bid, match type, status, or Final URL)."""
+    _validate_status(status)
+    fields: dict[str, Any] = _present(match_type=match_type, status=status)
+    if bid is not None:
+        fields["bid"] = Bid(amount=bid)
+    if final_url is not None:
+        fields["final_urls"] = [final_url]
+    keyword = Keyword(id=keyword_id, **fields)
+    resp = client.call(
+        CAMPAIGN,
+        "update_keywords",
+        UpdateKeywordsRequest(ad_group_id=ad_group_id, keywords=[keyword]),
+    )
+    errors = _partial_errors(resp)
+    return MutationResult(
+        ok=not errors,
+        message=f"Keyword {keyword_id} updated" if not errors else "Update failed",
+        ids=[str(keyword_id)],
+        partial_errors=errors,
+    )
+
+
+def delete_campaigns(client: MsAdsClient, *, campaign_ids: list[str]) -> MutationResult:
+    """Delete campaigns by id."""
+    resp = client.call(
+        CAMPAIGN,
+        "delete_campaigns",
+        DeleteCampaignsRequest(account_id=client.account_id, campaign_ids=campaign_ids),
+    )
+    return _delete_result(resp, campaign_ids, "campaign")
+
+
+def delete_ad_groups(
+    client: MsAdsClient, *, campaign_id: str, ad_group_ids: list[str]
+) -> MutationResult:
+    """Delete ad groups by id (within their parent campaign)."""
+    resp = client.call(
+        CAMPAIGN,
+        "delete_ad_groups",
+        DeleteAdGroupsRequest(campaign_id=campaign_id, ad_group_ids=ad_group_ids),
+    )
+    return _delete_result(resp, ad_group_ids, "ad group")
+
+
+def delete_ads(client: MsAdsClient, *, ad_group_id: str, ad_ids: list[str]) -> MutationResult:
+    """Delete ads by id (within their parent ad group)."""
+    resp = client.call(
+        CAMPAIGN, "delete_ads", DeleteAdsRequest(ad_group_id=ad_group_id, ad_ids=ad_ids)
+    )
+    return _delete_result(resp, ad_ids, "ad")
+
+
+def delete_keywords(
+    client: MsAdsClient, *, ad_group_id: str, keyword_ids: list[str]
+) -> MutationResult:
+    """Delete keywords by id (within their parent ad group)."""
+    resp = client.call(
+        CAMPAIGN,
+        "delete_keywords",
+        DeleteKeywordsRequest(ad_group_id=ad_group_id, keyword_ids=keyword_ids),
+    )
+    return _delete_result(resp, keyword_ids, "keyword")
+
+
+def _delete_result(resp: Any, ids: list[str], label: str) -> MutationResult:
+    """Delete responses carry only PartialErrors; success is the absence of errors."""
+    errors = _partial_errors(resp)
+    n = len(ids)
+    return MutationResult(
+        ok=not errors,
+        message=f"Deleted {n} {label}{'s' if n != 1 else ''}" if not errors else "Delete failed",
+        ids=[str(i) for i in ids],
         partial_errors=errors,
     )
 
