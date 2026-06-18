@@ -1,0 +1,126 @@
+src/microsoft_ads_mcp/server.py
+  s_fc176c5ca78215::t_1f82bd0c6d1b83 17-32
+src/microsoft_ads_mcp/services/conversions.py
+  s_fc176c5ca78215::t_17be04fb49acdd 96-98
+  s_fc176c5ca78215::t_251bf5938a7f59 13
+  s_fc176c5ca78215::t_4d43a49adf0802 1-12,14-27,29-69,71-95,99-100,102-107
+  s_fc176c5ca78215::t_b781cefd03b291 28
+  s_fc176c5ca78215::t_16d16c0adf7157 70,101
+src/microsoft_ads_mcp/services/reporting.py
+  s_fc176c5ca78215::t_8b1631e4734167 23,27
+  s_fc176c5ca78215::t_c50c9032f5d295 28
+  s_fc176c5ca78215::t_bf489662f67c22 92-96,100-105,110,112-115,118,124,141,148-193
+src/microsoft_ads_mcp/services/geo.py
+  s_fc176c5ca78215::t_8ea88e789189d4 96-107
+  s_fc176c5ca78215::t_ee7b944fbc428c 1-95,108-128,133
+  s_fc176c5ca78215::t_db6f17ff7136e2 129-132
+src/microsoft_ads_mcp/services/extensions.py
+  s_fc176c5ca78215::t_a8d95b78b9fb46 1-205
+tests/test_mutations.py
+  s_fc176c5ca78215::t_99673e3399af85 1-108
+src/microsoft_ads_mcp/services/negatives.py
+  s_fc176c5ca78215::t_b24cd6f58e2cfe 32
+  s_fc176c5ca78215::t_a674d70abc135a 72,133
+  s_fc176c5ca78215::t_ef79c36fd71cf2 1-31,33-71,73-132,134-143
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_fc176c5ca78215::t_e024692094d036 349-397
+  s_fc176c5ca78215::t_b13306971738d6 20-26,33-35,39-44,62-92
+  s_fc176c5ca78215::t_02c5f296cd7da5 225-226,237-238,249-250,253-346
+  s_fc176c5ca78215::t_44fef9e1474aa0 470-500
+  s_fc176c5ca78215::t_40d312b17f914c 501-551
+  s_fc176c5ca78215::t_2fd1c555c03c19 12
+  s_fc176c5ca78215::t_84c3f117ef2d33 98-103,112-113,117-157
+  s_fc176c5ca78215::t_d26482df6cdc23 11
+  s_fc176c5ca78215::t_8571d42cd3f36e 5-6
+  s_fc176c5ca78215::t_c3a67307bc3e08 187-216
+  s_fc176c5ca78215::t_98e0f1b77da100 398-469
+tests/test_conversions.py
+  s_fc176c5ca78215::t_6df40713b7407e 1-61
+src/microsoft_ads_mcp/tools/reporting_tools.py
+  s_fc176c5ca78215::t_94c41e3083eeef 20-24,34,36-41,49-53
+README.md
+  s_fc176c5ca78215::t_a254c1d0b1453d 154,156-162,165
+  s_fc176c5ca78215::t_73bad8f7eb58d0 106-109,111,113-117,119-139
+  s_fc176c5ca78215::t_340446498fce8e 5-8
+tests/test_health_auth_state.py
+  s_fc176c5ca78215::t_b7fbe6f5e655c8 5-6,10-11,15,34-37,41,49-50
+  s_fc176c5ca78215::t_a503858f0bf8c5 1-4,7-9,12-14,16-33,38-40,42-48,51-52
+src/microsoft_ads_mcp/api/client.py
+  s_fc176c5ca78215::t_331b29d3bf16fc 56-71
+src/microsoft_ads_mcp/services/mutations.py
+  s_fc176c5ca78215::t_38d75531997993 70-76,87-89
+  s_fc176c5ca78215::t_74921613788230 19-22,27-28,30
+  s_fc176c5ca78215::t_ea178a532c3305 148-149,156-164
+  s_fc176c5ca78215::t_412adc0cb1ca19 221-222,231-233
+  s_fc176c5ca78215::t_bf7b728d1430a3 255-460
+  s_fc176c5ca78215::t_316320948f4e33 53-68
+tests/test_read_only_gating.py
+  s_fc176c5ca78215::t_6458043abf242c 29-30,45-46
+  s_fc176c5ca78215::t_8862f8a0bb8930 24-25,43
+  s_fc176c5ca78215::t_6a887fd238835f 26-28,44
+  s_fc176c5ca78215::t_25b52c270a3ef0 13,15,17,19-23
+  s_fc176c5ca78215::t_8d76a039ad960b 31-33,48-50
+  s_fc176c5ca78215::t_64269527d30e13 47
+src/microsoft_ads_mcp/tools/health.py
+  s_fc176c5ca78215::t_c7c524c3818c54 9,11,16-36,43-45,51,54-55,62-63
+tests/test_extensions.py
+  s_fc176c5ca78215::t_d02b755899f080 1-97
+src/microsoft_ads_mcp/tools/read_tools.py
+  s_fc176c5ca78215::t_63b2cc5660630c 121-138
+  s_fc176c5ca78215::t_2cf48774e8b134 79-100
+  s_fc176c5ca78215::t_74087484d2c59f 162-201
+  s_fc176c5ca78215::t_fbee8ac432dedf 19,22,25
+  s_fc176c5ca78215::t_4faf6d690f1d85 101-120
+  s_fc176c5ca78215::t_4454381bde3429 17,23
+  s_fc176c5ca78215::t_7f2f5a2b92e7c0 139-161
+  s_fc176c5ca78215::t_213c1a54156be9 20-21
+  s_fc176c5ca78215::t_18a1fd63e8fcb2 13
+src/microsoft_ads_mcp/services/bulk.py
+  s_fc176c5ca78215::t_b740683142c739 155-157
+  s_fc176c5ca78215::t_ad1f7c7450db6f 1-154,158
+tests/test_reporting_scope.py
+  s_fc176c5ca78215::t_bdcc4b0747a85a 1-71
+skill/microsoft-ads-optimizer/SKILL.md
+  s_fc176c5ca78215::t_0958fb0d8c8b31 14-20,25-26,31-34,36,39,45-63,66-68
+tests/test_negatives.py
+  s_fc176c5ca78215::t_b3d15d36620cb9 1-90
+src/microsoft_ads_mcp/services/criteria.py
+  s_fc176c5ca78215::t_dcabcd58bbf23c 1-31,35-129
+  s_fc176c5ca78215::t_7f01530a6e626b 32-34
+tests/test_geo_criteria_bulk.py
+  s_fc176c5ca78215::t_85fd75e1beb617 1-89
+src/microsoft_ads_mcp/services/__init__.py
+  s_fc176c5ca78215::t_14fe543cf427a8 28-36,42-55
+  s_fc176c5ca78215::t_24009013a41e98 37-41
+src/microsoft_ads_mcp/domain/entities.py
+  s_fc176c5ca78215::t_507b70331b5e34 223-258
+  s_fc176c5ca78215::t_f59de111eedee1 18-19
+  s_fc176c5ca78215::t_83c8b22e12f051 324-341
+  s_fc176c5ca78215::t_f06cf6c4af8e82 259-293
+  s_fc176c5ca78215::t_14c6e7286ec90d 168-187
+  s_fc176c5ca78215::t_a04aed09d74d58 41-45,48-49
+  s_fc176c5ca78215::t_69a8a2e630d1f6 142-146,161-164
+  s_fc176c5ca78215::t_9f5f3baa99acf0 20-28
+  s_fc176c5ca78215::t_02fe6b78f4b837 188-219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "06a3b7fcc4ae723472326afcb6666491a39f38e4",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_fc176c5ca78215": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f51c3f7c-4595-452e-82ad-ebe9277ea108",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
