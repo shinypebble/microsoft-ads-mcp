@@ -72,7 +72,7 @@ class CampaignSummary(BaseModel):
         return cls(
             id=str(_get(c, "Id", "id")),
             name=_get(c, "Name", "name"),
-            status=str(_get(c, "Status", "status")) if _get(c, "Status", "status") else None,
+            status=_str_or_none(_get(c, "Status", "status")),
             campaign_type=str(ctype) if ctype is not None else None,
             daily_budget=_get(c, "DailyBudget", "daily_budget"),
             budget_id=_str_or_none(_get(c, "BudgetId", "budget_id")),
@@ -92,7 +92,7 @@ class AdGroupSummary(BaseModel):
         return cls(
             id=str(_get(ag, "Id", "id")),
             name=_get(ag, "Name", "name"),
-            status=str(_get(ag, "Status", "status")) if _get(ag, "Status", "status") else None,
+            status=_str_or_none(_get(ag, "Status", "status")),
             cpc_bid=amount,
         )
 
@@ -165,4 +165,7 @@ class ReportResult(BaseModel):
 
 
 def _str_or_none(val: Any) -> str | None:
-    return str(val) if val is not None else None
+    """Stringify a value, unwrapping SDK enums to ``.value`` (not the ``Class.MEMBER`` repr)."""
+    if val is None:
+        return None
+    return str(getattr(val, "value", val))

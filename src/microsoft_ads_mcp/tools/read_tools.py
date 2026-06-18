@@ -39,7 +39,7 @@ def register(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"read"}, annotations=_READ)
-    def get_ad_groups(campaign_id: int) -> list[AdGroupSummary]:
+    def get_ad_groups(campaign_id: str) -> list[AdGroupSummary]:
         """List ad groups in a campaign.
 
         Args:
@@ -48,7 +48,7 @@ def register(mcp: FastMCP) -> None:
         return guarded(lambda: campaigns.get_ad_groups(get_client(), campaign_id))
 
     @mcp.tool(tags={"read"}, annotations=_READ)
-    def get_keywords(ad_group_id: int) -> list[KeywordSummary]:
+    def get_keywords(ad_group_id: str) -> list[KeywordSummary]:
         """List keywords in an ad group.
 
         Args:
@@ -57,7 +57,7 @@ def register(mcp: FastMCP) -> None:
         return guarded(lambda: campaigns.get_keywords(get_client(), ad_group_id))
 
     @mcp.tool(tags={"read"}, annotations=_READ)
-    def get_ads(ad_group_id: int) -> list[AdSummary]:
+    def get_ads(ad_group_id: str) -> list[AdSummary]:
         """List text/responsive-search ads in an ad group.
 
         Args:

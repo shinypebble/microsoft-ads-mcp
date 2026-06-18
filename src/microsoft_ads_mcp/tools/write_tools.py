@@ -30,7 +30,7 @@ def register(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
-    def update_campaign_status(campaign_id: int, status: str) -> MutationResult:
+    def update_campaign_status(campaign_id: str, status: str) -> MutationResult:
         """Set a campaign Active or Paused.
 
         Args:
@@ -44,23 +44,26 @@ def register(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
-    def create_ad_group(campaign_id: int, name: str, cpc_bid: float = 1.0) -> MutationResult:
+    def create_ad_group(
+        campaign_id: str, name: str, cpc_bid: float = 1.0, language: str = "English"
+    ) -> MutationResult:
         """Create an ad group (PAUSED) in a campaign.
 
         Args:
             campaign_id: The parent campaign id.
             name: Ad group name.
             cpc_bid: Default CPC bid in account currency (default 1.0).
+            language: Ad group language (required by Microsoft; default "English").
         """
         return guarded(
             lambda: mutations.create_ad_group(
-                get_client(), campaign_id=campaign_id, name=name, cpc_bid=cpc_bid
+                get_client(), campaign_id=campaign_id, name=name, cpc_bid=cpc_bid, language=language
             )
         )
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
     def add_keywords(
-        ad_group_id: int,
+        ad_group_id: str,
         keywords: list[str],
         match_type: MatchType = "Broad",
         default_bid: float = 1.0,
@@ -85,7 +88,7 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
     def create_responsive_search_ad(
-        ad_group_id: int,
+        ad_group_id: str,
         final_url: str,
         headlines: list[str],
         descriptions: list[str],

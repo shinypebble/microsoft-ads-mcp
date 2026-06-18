@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from microsoft_ads_mcp.config import Settings
 
 
-def test_defaults_have_no_credentials() -> None:
+def test_defaults_have_no_credentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Hermetic: run where there is no .env (the project root has a real one) and with no
+    # exported MICROSOFT_ADS_* vars, so this asserts true defaults rather than ambient state.
+    monkeypatch.chdir(tmp_path)
+    for var in ("MICROSOFT_ADS_DEVELOPER_TOKEN", "MICROSOFT_ADS_CLIENT_ID", "READ_ONLY"):
+        monkeypatch.delenv(var, raising=False)
     s = Settings()
     assert s.has_credentials is False
     assert s.read_only is False

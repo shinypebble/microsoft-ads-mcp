@@ -18,7 +18,13 @@ _INSTRUCTIONS = (
     "`search_accounts` to find account ids, then `get_campaigns` / `get_ad_groups` / "
     "`get_keywords` / `get_ads` to walk the tree, and `run_performance_report` for "
     "performance (it downloads and parses the report for you). When writes are enabled "
-    "(READ_ONLY=false), new campaigns/ad groups/ads are created PAUSED."
+    "(READ_ONLY=false), new campaigns/ad groups/ads are created PAUSED.\n"
+    "First-time sign-in: if a tool reports authentication failed / no refresh token, the user "
+    "must authorize once. Call `get_auth_url`, present the returned URL to the user as a "
+    "sign-in link, and ask them to sign in with the account that manages the ad account "
+    "(Microsoft, or Google for Google-federated accounts). They will land on a near-blank "
+    "page; have them paste that full redirect URL "
+    "back, then call `complete_auth` with it. This is only needed once."
 )
 
 

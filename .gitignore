@@ -56,3 +56,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# MCP
+.mcp.json

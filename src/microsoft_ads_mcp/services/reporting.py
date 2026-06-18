@@ -95,7 +95,7 @@ def run_performance_report(
     request_cls, scope_cls, default_cols = _REPORTS[report_type]
     cols = columns or default_cols
 
-    scope = scope_cls(account_ids=[int(client.account_id)])
+    scope = scope_cls(account_ids=[client.account_id])
     report_request = request_cls(
         format="Csv",
         report_name=f"{report_type} {date_range}",

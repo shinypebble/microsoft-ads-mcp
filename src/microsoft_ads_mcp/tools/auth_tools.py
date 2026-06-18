@@ -13,18 +13,27 @@ from ._common import guarded
 def register(mcp: FastMCP, settings: Settings) -> None:
     @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True))
     def get_auth_url() -> str:
-        """Return the OAuth sign-in URL. Open it, sign in, then call complete_auth.
+        """Begin one-time sign-in: returns an OAuth sign-in URL to give the user.
 
-        Only needed once if MICROSOFT_ADS_REFRESH_TOKEN is not set.
+        The URL targets the account's identity provider (Microsoft by default, or Google for
+        Google-federated accounts). Present it to the user as a clickable sign-in link, and ask
+        them to sign in with the account that manages the ad account. After they sign in,
+        the browser lands on a near-blank page whose address-bar URL contains a ``code=``
+        value; have them paste that full URL back, then call ``complete_auth`` with it.
+
+        Only needed once, when no refresh token is configured. The minted token is persisted
+        and auto-refreshed thereafter, so the user never has to repeat this.
         """
         return guarded(lambda: auth.authorization_url(settings))
 
     @mcp.tool(annotations=ToolAnnotations(openWorldHint=True))
     def complete_auth(redirect_url: str) -> str:
-        """Complete OAuth using the full redirect URL from the browser, persisting the token.
+        """Finish sign-in: exchange the browser's redirect URL for a saved refresh token.
+
+        Call this with the URL the user pasted back after completing ``get_auth_url``.
 
         Args:
-            redirect_url: The URL the browser landed on after sign-in (contains ``code=``).
+            redirect_url: The full URL the browser landed on after sign-in (contains ``code=``).
         """
 
         def _run() -> str:

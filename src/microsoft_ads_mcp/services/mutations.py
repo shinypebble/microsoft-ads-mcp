@@ -13,6 +13,7 @@ from openapi_client.models.campaign.add_ad_groups_request import AddAdGroupsRequ
 from openapi_client.models.campaign.add_ads_request import AddAdsRequest
 from openapi_client.models.campaign.add_campaigns_request import AddCampaignsRequest
 from openapi_client.models.campaign.add_keywords_request import AddKeywordsRequest
+from openapi_client.models.campaign.asset_link import AssetLink
 from openapi_client.models.campaign.bid import Bid
 from openapi_client.models.campaign.campaign import Campaign
 from openapi_client.models.campaign.get_campaigns_by_ids_request import GetCampaignsByIdsRequest
@@ -74,7 +75,7 @@ def create_campaign(
     )
 
 
-def update_campaign_status(client: MsAdsClient, *, campaign_id: int, status: str) -> MutationResult:
+def update_campaign_status(client: MsAdsClient, *, campaign_id: str, status: str) -> MutationResult:
     """Set a campaign to Active or Paused (reads the campaign, then updates status)."""
     if status not in ("Active", "Paused"):
         raise ValueError("status must be 'Active' or 'Paused'")
@@ -88,8 +89,9 @@ def update_campaign_status(client: MsAdsClient, *, campaign_id: int, status: str
     campaigns = as_list(_unwrap(first_attr(got, "Campaigns", "campaigns"), "Campaign", "campaign"))
     if not campaigns:
         return MutationResult(ok=False, message=f"Campaign {campaign_id} not found")
-    campaign = campaigns[0]
-    campaign.Status = status
+    # Partial update: send only the id and new status. Re-submitting the full fetched campaign
+    # makes the update endpoint reject round-tripped fields (e.g. IsPolitical) as invalid JSON.
+    campaign = Campaign(id=campaign_id, status=status)
     resp = client.call(
         CAMPAIGN,
         "update_campaigns",
@@ -105,10 +107,19 @@ def update_campaign_status(client: MsAdsClient, *, campaign_id: int, status: str
 
 
 def create_ad_group(
-    client: MsAdsClient, *, campaign_id: int, name: str, cpc_bid: float = 1.0
+    client: MsAdsClient,
+    *,
+    campaign_id: str,
+    name: str,
+    cpc_bid: float = 1.0,
+    language: str = "English",
 ) -> MutationResult:
-    """Create a paused ad group with a default CPC bid."""
-    ad_group = AdGroup(name=name, status="Paused", cpc_bid=Bid(amount=cpc_bid))
+    """Create a paused ad group with a default CPC bid.
+
+    ``language`` is required by Microsoft Advertising (error 1257
+    ``CampaignServiceMissingLanguage`` otherwise); it defaults to English.
+    """
+    ad_group = AdGroup(name=name, status="Paused", cpc_bid=Bid(amount=cpc_bid), language=language)
     resp = client.call(
         CAMPAIGN,
         "add_ad_groups",
@@ -131,7 +142,7 @@ def create_ad_group(
 def add_keywords(
     client: MsAdsClient,
     *,
-    ad_group_id: int,
+    ad_group_id: str,
     keywords: list[str],
     match_type: MatchType = "Broad",
     default_bid: float = 1.0,
@@ -159,7 +170,7 @@ def add_keywords(
 def create_responsive_search_ad(
     client: MsAdsClient,
     *,
-    ad_group_id: int,
+    ad_group_id: str,
     final_url: str,
     headlines: list[str],
     descriptions: list[str],
@@ -194,9 +205,13 @@ def create_responsive_search_ad(
     )
 
 
-def _asset_link(text: str) -> dict[str, Any]:
-    """An AssetLink carrying a TextAsset. The SDK accepts a dict for the polymorphic asset."""
-    return {"Asset": TextAsset(type="Text", text=text).to_dict()}
+def _asset_link(text: str) -> AssetLink:
+    """An AssetLink carrying a TextAsset.
+
+    Build it as a model (not a dict) so the polymorphic ``Asset`` keeps its ``TextAsset``
+    subtype; a plain dict deserializes into the base ``Asset`` and fails to serialize.
+    """
+    return AssetLink(asset=TextAsset(type="TextAsset", text=text))
 
 
 def _unwrap(value: Any, *keys: str) -> Any:

@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     developer_token: str = Field(default="", validation_alias="MICROSOFT_ADS_DEVELOPER_TOKEN")
     client_id: str = Field(default="", validation_alias="MICROSOFT_ADS_CLIENT_ID")
     client_secret: str = Field(default="", validation_alias="MICROSOFT_ADS_CLIENT_SECRET")
+    # Which identity provider the account signs in with: "microsoft" (Azure, default) or
+    # "google" (for Bing Ads accounts federated to a Google login). The client id/secret above
+    # then correspond to the matching OAuth app (Azure app vs Google Cloud OAuth client).
+    identity_provider: str = Field(
+        default="microsoft", validation_alias="MICROSOFT_ADS_IDENTITY_PROVIDER"
+    )
     refresh_token: str = Field(default="", validation_alias="MICROSOFT_ADS_REFRESH_TOKEN")
     account_id: str = Field(default="", validation_alias="MICROSOFT_ADS_ACCOUNT_ID")
     customer_id: str = Field(default="", validation_alias="MICROSOFT_ADS_CUSTOMER_ID")

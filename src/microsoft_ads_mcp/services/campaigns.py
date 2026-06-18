@@ -43,7 +43,7 @@ def get_campaigns(client: MsAdsClient, *, include_deleted: bool = False) -> list
     return out
 
 
-def get_ad_groups(client: MsAdsClient, campaign_id: int) -> list[AdGroupSummary]:
+def get_ad_groups(client: MsAdsClient, campaign_id: str) -> list[AdGroupSummary]:
     resp = client.call(
         CAMPAIGN,
         "get_ad_groups_by_campaign_id",
@@ -53,7 +53,7 @@ def get_ad_groups(client: MsAdsClient, campaign_id: int) -> list[AdGroupSummary]
     return [AdGroupSummary.from_sdk(ag) for ag in items]
 
 
-def get_keywords(client: MsAdsClient, ad_group_id: int) -> list[KeywordSummary]:
+def get_keywords(client: MsAdsClient, ad_group_id: str) -> list[KeywordSummary]:
     resp = client.call(
         CAMPAIGN,
         "get_keywords_by_ad_group_id",
@@ -63,7 +63,7 @@ def get_keywords(client: MsAdsClient, ad_group_id: int) -> list[KeywordSummary]:
     return [KeywordSummary.from_sdk(kw) for kw in items]
 
 
-def get_ads(client: MsAdsClient, ad_group_id: int) -> list[AdSummary]:
+def get_ads(client: MsAdsClient, ad_group_id: str) -> list[AdSummary]:
     resp = client.call(
         CAMPAIGN,
         "get_ads_by_ad_group_id",
