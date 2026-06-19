@@ -1,0 +1,14 @@
+.github/workflows/ci.yml
+  h_f59d9e9062174a 10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "056b2ca1d1bac694212b93e6539039d4a550c3bf",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
