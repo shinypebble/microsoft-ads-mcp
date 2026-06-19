@@ -20,7 +20,15 @@ class Settings(BaseSettings):
     transport vars keep their conventional names (matched case-insensitively to the fields).
     """
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        # Let the field names populate directly (env still loads via the validation_alias).
+        # Without this, `Settings(developer_token=...)` is silently dropped and the value falls
+        # back to the environment -- which made tests pass only when real creds were exported.
+        validate_by_name=True,
+    )
 
     # --- Microsoft Advertising credentials ---
     # Optional at load time so the package imports without secrets (e.g. in tests); the server
