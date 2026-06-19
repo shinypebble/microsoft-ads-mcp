@@ -1,0 +1,85 @@
+tests/test_read_only_gating.py
+  s_e057564ed4ab50::t_3b1cb6c9960102 36
+  s_e057564ed4ab50::t_7293730b7322b4 55
+tests/test_url_tracking.py
+  s_e057564ed4ab50::t_c9e2650ccd830b 162
+  s_e057564ed4ab50::t_d86ecfffd6f525 1-161,163-178
+README.md
+  s_e057564ed4ab50::t_7a9091e9db7240 136-138
+  s_e057564ed4ab50::t_e5f81830fc9f18 178
+  s_e057564ed4ab50::t_1f24edb491aa44 118-124
+  s_e057564ed4ab50::t_9fd2b774093b4f 139-141
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_e057564ed4ab50::t_a75011481fffb1 229-231,242-245,256-258
+  s_e057564ed4ab50::t_4f0ddee48f50ba 83,95-96,108
+  s_e057564ed4ab50::t_5e8ae82f295ac3 315,332-333,348
+  s_e057564ed4ab50::t_002d15e6b387fb 156,168-169,181
+  s_e057564ed4ab50::t_7b555990273aef 12-20
+  s_e057564ed4ab50::t_5bb3351466fa37 272,285-286,299
+  s_e057564ed4ab50::t_5d1cf379fead49 353-379
+  s_e057564ed4ab50::t_4b49cbbd740528 191-193,202-206,215-217
+  s_e057564ed4ab50::t_65cf5dcca6225b 390
+  s_e057564ed4ab50::t_5ddc260fc6acfe 120,131-132,143
+  s_e057564ed4ab50::t_91d136032ec9db 34,45-46,56
+src/microsoft_ads_mcp/server.py
+  s_e057564ed4ab50::t_aabb4b6e59cd38 50
+  s_e057564ed4ab50::t_c5e07975500dcc 41-45
+  s_e057564ed4ab50::t_7aa428fb4de87b 40
+  s_e057564ed4ab50::t_695f972d847375 51-53
+src/microsoft_ads_mcp/services/conversions.py
+  s_e057564ed4ab50::t_b308404e8622f1 107
+src/microsoft_ads_mcp/services/account_properties.py
+  s_e057564ed4ab50::t_a90d98de453075 1-64,68-84,86-88
+  s_e057564ed4ab50::t_b382502c217738 85
+  s_e057564ed4ab50::t_65cf5dcca6225b 66
+  s_e057564ed4ab50::t_eaf646e8d10c43 65,67
+src/microsoft_ads_mcp/tools/read_tools.py
+  s_e057564ed4ab50::t_d08976106f990b 13,26-36
+  s_e057564ed4ab50::t_22ed17cdc74b9e 92-103
+ty.toml
+  s_e057564ed4ab50::t_96eebb82df181d 6-9
+src/microsoft_ads_mcp/services/reporting.py
+  s_e057564ed4ab50::t_b308404e8622f1 159
+src/microsoft_ads_mcp/services/mutations.py
+  s_e057564ed4ab50::t_0ec233c1c7c111 19-20
+  s_e057564ed4ab50::t_c8dea07530553b 90,102-104
+  s_e057564ed4ab50::t_35c15941559041 304,317
+  s_e057564ed4ab50::t_3ee0e708a7c46a 427-429,431,433-439
+  s_e057564ed4ab50::t_0b02d3781ec599 344,353
+  s_e057564ed4ab50::t_65cf5dcca6225b 79,408
+  s_e057564ed4ab50::t_b1553c841e8fc8 210-212,214-222,224-230
+  s_e057564ed4ab50::t_c259e0ae610702 259,269-271
+  s_e057564ed4ab50::t_4098c3ede3ecae 71-78,80-81
+  s_e057564ed4ab50::t_bd6304ccb73004 385,399
+  s_e057564ed4ab50::t_d82ac299d3a9bf 166,179-181
+src/microsoft_ads_mcp/domain/entities.py
+  s_e057564ed4ab50::t_11d2fe250b7f54 262
+  s_e057564ed4ab50::t_ea66a1c96b8264 136-139,150-152
+  s_e057564ed4ab50::t_30de09879020aa 372-390
+  s_e057564ed4ab50::t_bb11037c3335ef 391-428
+  s_e057564ed4ab50::t_bef2dffae79fa6 76-100
+  s_e057564ed4ab50::t_1915c01b2bc745 108-111,125-127
+  s_e057564ed4ab50::t_393f66df805f39 162-166,178-181
+  s_e057564ed4ab50::t_b544a72967b3f1 195-198,206,211-213
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "c0bc17b96f8c6d190d0718e1a58c56fe1d588937",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_e057564ed4ab50": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07c9115e-6013-4d46-afb7-8eee4fb6ac74",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
