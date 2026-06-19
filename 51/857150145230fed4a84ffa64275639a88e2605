@@ -1,0 +1,26 @@
+.github/workflows/ci.yml
+  h_f59d9e9062174a 10
+src/microsoft_ads_mcp/config.py
+  s_b61dc7731ee508::t_e67e7d76407e92 23-31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "51857150145230fed4a84ffa64275639a88e2605",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_b61dc7731ee508": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "66ba8102-a390-4f23-b77d-f5c02ac1caa2",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
