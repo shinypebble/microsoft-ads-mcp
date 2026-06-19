@@ -28,6 +28,21 @@ IntentOption = Literal[
     # People in, searching for, or viewing pages about the targeted locations (Microsoft default).
     "PeopleInOrSearchingForOrViewingPages",
 ]
+# Conversion-goal bidding / value knobs. Microsoft's enum spellings, used verbatim so they map
+# straight onto the API. (Goal status reuses CampaignStatus -- Active / Paused.)
+ConversionCountType = Literal["All", "Unique"]
+ConversionRevenueType = Literal["FixedValue", "VariableValue", "NoValue"]
+# Days an ad schedule (dayparting) criterion can target. Microsoft's enum spelling is used
+# verbatim so it maps straight onto the API.
+Weekday = Literal[
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+]
 # Discriminated auth result so a client can branch deterministically instead of string-matching.
 AuthState = Literal[
     "ok",
@@ -116,6 +131,16 @@ class CampaignSummary(BaseModel):
     campaign_type: str | None = None
     daily_budget: float | None = None
     budget_id: str | None = None
+    # The campaign time zone (e.g. "CentralTimeUSCanada"). Ad schedules run in this zone unless
+    # ad_schedule_use_searcher_time_zone is true, so it's needed to verify a dayparting setup.
+    time_zone: str | None = None
+    start_date: str | None = None  # "YYYY-MM-DD", or null when the campaign has no explicit start
+    languages: list[str] | None = None
+    # The bid strategy (BiddingScheme.Type), e.g. "EnhancedCpc", "MaxConversions".
+    bid_strategy_type: str | None = None
+    # When true, ad-schedule hours are interpreted in each searcher's time zone, not the campaign's.
+    # Only populated when get_campaigns requests it; null means "not reported".
+    ad_schedule_use_searcher_time_zone: bool | None = None
     # URL tracking (carries the click id + UTMs). null means "not set at this level".
     tracking_url_template: str | None = None
     final_url_suffix: str | None = None
@@ -126,6 +151,7 @@ class CampaignSummary(BaseModel):
         ctype = _get(c, "CampaignType", "campaign_type")
         if isinstance(ctype, list):
             ctype = ", ".join(str(t) for t in ctype) or None
+        scheme = _get(c, "BiddingScheme", "bidding_scheme")
         return cls(
             id=str(_get(c, "Id", "id")),
             name=_get(c, "Name", "name"),
@@ -133,6 +159,15 @@ class CampaignSummary(BaseModel):
             campaign_type=str(ctype) if ctype is not None else None,
             daily_budget=_get(c, "DailyBudget", "daily_budget"),
             budget_id=_str_or_none(_get(c, "BudgetId", "budget_id")),
+            time_zone=_get(c, "TimeZone", "time_zone"),
+            start_date=_date_str(_get(c, "StartDate", "start_date")),
+            languages=_str_list(_get(c, "Languages", "languages")),
+            bid_strategy_type=(
+                _str_or_none(_get(scheme, "Type", "type")) if scheme is not None else None
+            ),
+            ad_schedule_use_searcher_time_zone=_get(
+                c, "AdScheduleUseSearcherTimeZone", "ad_schedule_use_searcher_time_zone"
+            ),
             tracking_url_template=_get(c, "TrackingUrlTemplate", "tracking_url_template"),
             final_url_suffix=_get(c, "FinalUrlSuffix", "final_url_suffix"),
             url_custom_parameters=_custom_params(c),
@@ -285,9 +320,21 @@ class ConversionGoalSummary(BaseModel):
     status: str | None = None
     tag_id: str | None = None
     tracking_status: str | None = None
+    # The inverse of the UI's "Include in conversions" checkbox: the single switch for whether
+    # the goal steers automated bidding. False => counts in the Conversions column and ECPC/tCPA
+    # bid math; True => only reported under All conversions, ignored by bidding.
+    exclude_from_bidding: bool | None = None
+    count_type: str | None = None  # "All" (every conversion per click) or "Unique" (one per click)
+    conversion_window_in_minutes: int | None = None  # click-to-conversion lookback
+    goal_category: str | None = None  # e.g. Purchase, SubmitLeadForm, Signup, None
+    # Conversion value model, flattened from the SDK's nested Revenue object.
+    revenue_type: str | None = None  # "FixedValue" / "VariableValue" / "NoValue"
+    revenue_value: float | None = None
+    revenue_currency_code: str | None = None
 
     @classmethod
     def from_sdk(cls, g: Any) -> ConversionGoalSummary:
+        revenue = _get(g, "Revenue", "revenue")
         return cls(
             id=str(_get(g, "Id", "id")),
             name=_get(g, "Name", "name"),
@@ -295,6 +342,17 @@ class ConversionGoalSummary(BaseModel):
             status=_str_or_none(_get(g, "Status", "status")),
             tag_id=_str_or_none(_get(g, "TagId", "tag_id")),
             tracking_status=_str_or_none(_get(g, "TrackingStatus", "tracking_status")),
+            exclude_from_bidding=_get(g, "ExcludeFromBidding", "exclude_from_bidding"),
+            count_type=_str_or_none(_get(g, "CountType", "count_type")),
+            conversion_window_in_minutes=_get(
+                g, "ConversionWindowInMinutes", "conversion_window_in_minutes"
+            ),
+            goal_category=_str_or_none(_get(g, "GoalCategory", "goal_category")),
+            revenue_type=_str_or_none(_get(revenue, "Type", "type")) if revenue else None,
+            revenue_value=_get(revenue, "Value", "value") if revenue else None,
+            revenue_currency_code=(
+                _get(revenue, "CurrencyCode", "currency_code") if revenue else None
+            ),
         )
 
 
@@ -363,6 +421,89 @@ class LocationIntentSummary(BaseModel):
         )
 
 
+class DeviceBidAdjustmentSummary(BaseModel):
+    """A device bid-adjustment criterion on a campaign (one per device type).
+
+    A campaign normally has either no device criterions (no modifier on any device) or all three
+    (Computers / Smartphones / Tablets). ``bid_adjustment`` is a percent modifier; -100 excludes
+    the device entirely.
+    """
+
+    criterion_id: str | None = None  # the campaign criterion id
+    campaign_id: str | None = None
+    device: str | None = None  # "Computers", "Smartphones", or "Tablets"
+    bid_adjustment: float | None = None
+
+    @classmethod
+    def from_sdk(cls, c: Any) -> DeviceBidAdjustmentSummary:
+        crit = _get(c, "Criterion", "criterion")
+        bid = _get(c, "CriterionBid", "criterion_bid")
+        return cls(
+            criterion_id=_str_or_none(_get(c, "Id", "id")),
+            campaign_id=_str_or_none(_get(c, "CampaignId", "campaign_id")),
+            device=_get(crit, "DeviceName", "device_name") if crit else None,
+            # Device bid adjustments are BidMultiplier (Multiplier), like location/ad-schedule.
+            bid_adjustment=(
+                _get(bid, "Multiplier", "multiplier", "Amount", "amount") if bid else None
+            ),
+        )
+
+
+class AdScheduleInput(BaseModel):
+    """One dayparting window to add to a campaign.
+
+    Hours are 0-24 (``from_hour`` inclusive, ``to_hour`` exclusive of the final minutes); minutes
+    are at 15-minute granularity, so only 0/15/30/45 are accepted. Times run in the campaign's
+    time zone unless ``use_searcher_time_zone`` is set on the campaign.
+    """
+
+    day: Weekday
+    from_hour: int  # 0-24
+    to_hour: int  # 0-24
+    from_minute: int = 0  # 0, 15, 30, or 45
+    to_minute: int = 0  # 0, 15, 30, or 45
+    bid_adjustment: float = 0.0  # percent modifier applied during this window (0 = no change)
+
+
+class AdScheduleSummary(BaseModel):
+    """One ad-schedule (dayparting) criterion on a campaign."""
+
+    criterion_id: str | None = None  # the campaign criterion id (use this to remove the window)
+    campaign_id: str | None = None
+    day: str | None = None
+    from_hour: int | None = None
+    from_minute: int | None = None
+    to_hour: int | None = None
+    to_minute: int | None = None
+    bid_adjustment: float | None = None
+
+    @classmethod
+    def from_sdk(cls, c: Any) -> AdScheduleSummary:
+        crit = _get(c, "Criterion", "criterion")
+        bid = _get(c, "CriterionBid", "criterion_bid")
+        return cls(
+            criterion_id=_str_or_none(_get(c, "Id", "id")),
+            campaign_id=_str_or_none(_get(c, "CampaignId", "campaign_id")),
+            day=_str_or_none(_get(crit, "Day", "day")) if crit else None,
+            from_hour=_get(crit, "FromHour", "from_hour") if crit else None,
+            from_minute=_minute_to_int(_get(crit, "FromMinute", "from_minute")) if crit else None,
+            to_hour=_get(crit, "ToHour", "to_hour") if crit else None,
+            to_minute=_minute_to_int(_get(crit, "ToMinute", "to_minute")) if crit else None,
+            bid_adjustment=(
+                _get(bid, "Multiplier", "multiplier", "Amount", "amount") if bid else None
+            ),
+        )
+
+
+class AdScheduleSettings(BaseModel):
+    """A campaign's full ad-schedule view: the windows plus the time-zone context they run in."""
+
+    campaign_id: str
+    time_zone: str | None = None
+    use_searcher_time_zone: bool | None = None
+    schedules: list[AdScheduleSummary] = []
+
+
 class PostalCodeLocation(BaseModel):
     """Result of resolving a ZIP/postal code to a Microsoft LocationId."""
 
@@ -419,6 +560,41 @@ def _as_bool(val: Any) -> bool | None:
         return True
     if s in ("false", "0"):
         return False
+    return None
+
+
+_MINUTE_NAME_TO_INT = {"Zero": 0, "Fifteen": 15, "Thirty": 30, "FortyFive": 45}
+
+
+def _minute_to_int(val: Any) -> int | None:
+    """Map a Microsoft ``Minute`` enum (Zero/Fifteen/Thirty/FortyFive) to its integer minute."""
+    if val is None:
+        return None
+    name = str(getattr(val, "value", val))
+    return _MINUTE_NAME_TO_INT.get(name)
+
+
+def _date_str(val: Any) -> str | None:
+    """Render an SDK date (``datetime`` or a ``{Year, Month, Day}`` object) as "YYYY-MM-DD"."""
+    if val is None:
+        return None
+    year = _get(val, "Year", "year")
+    month = _get(val, "Month", "month")
+    day = _get(val, "Day", "day")
+    if year and month and day:
+        return f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+    # A bare datetime: take the date portion of its ISO form.
+    iso = getattr(val, "isoformat", None)
+    return iso()[:10] if callable(iso) else str(val)
+
+
+def _str_list(val: Any) -> list[str] | None:
+    """Normalize a string-list field (bare list or ``{"string": [...]}`` wrapper) to a list."""
+    if val is None:
+        return None
+    items = _get(val, "string", default=val)
+    if isinstance(items, list):
+        return [str(i) for i in items] or None
     return None
 
 

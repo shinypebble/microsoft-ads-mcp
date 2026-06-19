@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from microsoft_ads_mcp.domain.entities import AdScheduleInput
 from microsoft_ads_mcp.services import bulk, criteria, geo
 
 
@@ -150,6 +151,258 @@ def test_set_location_intent_adds_when_no_criterion_exists() -> None:
     assert request.criterion_type.name == "TARGETS"
     cc = request.campaign_criterions[0]
     assert cc.id is None and cc.criterion.intent_option.value == "PeopleIn"
+
+
+def _daytime_criterion(criterion_id: str, day: str) -> Any:
+    crit = SimpleNamespace(
+        type="DayTimeCriterion",
+        day=day,
+        from_hour=9,
+        from_minute=SimpleNamespace(value="Fifteen"),
+        to_hour=16,
+        to_minute=SimpleNamespace(value="FortyFive"),
+    )
+    bid = SimpleNamespace(type="BidMultiplier", multiplier=0.0)
+    return SimpleNamespace(
+        id=criterion_id, campaign_id="487928625", criterion=crit, criterion_bid=bid
+    )
+
+
+def _campaign(campaign_id: str, time_zone: str, searcher: bool) -> Any:
+    return SimpleNamespace(
+        id=campaign_id,
+        name="C",
+        status="Active",
+        campaign_type="Search",
+        time_zone=time_zone,
+        ad_schedule_use_searcher_time_zone=searcher,
+    )
+
+
+def test_get_ad_schedules_reads_windows_and_time_zone_context() -> None:
+    daytime_resp = SimpleNamespace(
+        campaign_criterions=[
+            _daytime_criterion("901", "Monday"),
+            _daytime_criterion("902", "Tuesday"),
+        ]
+    )
+    campaigns_resp = SimpleNamespace(
+        campaigns=[_campaign("487928625", "CentralTimeUSCanada", False)]
+    )
+    client = _SequencedClient(daytime_resp, campaigns_resp)
+    settings = criteria.get_ad_schedules(client, campaign_id="487928625")
+    assert settings.time_zone == "CentralTimeUSCanada"
+    assert settings.use_searcher_time_zone is False
+    assert [w.day for w in settings.schedules] == ["Monday", "Tuesday"]
+    w = settings.schedules[0]
+    assert (w.from_hour, w.from_minute, w.to_hour, w.to_minute) == (9, 15, 16, 45)
+    assert w.criterion_id == "901" and w.bid_adjustment == 0.0
+    # The DayTime criterions are read with the specific LocationIntent-style DayTime filter.
+    assert client.calls[0][1] == "get_campaign_criterions_by_ids"
+    assert client.calls[0][2].criterion_type.name == "DAYTIME"
+    # Time-zone context is fetched for just this campaign, not by scanning the whole account.
+    assert client.calls[1][1] == "get_campaigns_by_ids"
+    assert client.calls[1][2].campaign_ids == ["487928625"]
+
+
+def test_add_ad_schedules_builds_daytime_criterions_under_targets() -> None:
+    add_resp = SimpleNamespace(campaign_criterion_ids=["1", "2"], nested_partial_errors=[])
+    client = _FakeClient(add_resp)
+    schedules = [
+        AdScheduleInput(day="Monday", from_hour=9, from_minute=15, to_hour=16, to_minute=45),
+        AdScheduleInput(
+            day="Saturday",
+            from_hour=9,
+            from_minute=15,
+            to_hour=16,
+            to_minute=45,
+            bid_adjustment=10.0,
+        ),
+    ]
+    result = criteria.add_ad_schedules(client, campaign_id="487928625", schedules=schedules)
+    assert result.ok and result.ids == ["1", "2"]
+    _, method, request = client.calls[0]
+    assert method == "add_campaign_criterions"
+    # Adds of target criterions (incl. day/time) must use the umbrella Targets type.
+    assert request.criterion_type.name == "TARGETS"
+    cc0 = request.campaign_criterions[0]
+    assert cc0.type == "BiddableCampaignCriterion" and cc0.campaign_id == "487928625"
+    assert cc0.criterion.type == "DayTimeCriterion"
+    assert cc0.criterion.day.value == "Monday"
+    assert (
+        cc0.criterion.from_minute.value == "Fifteen"
+        and cc0.criterion.to_minute.value == "FortyFive"
+    )
+    assert cc0.criterion_bid is None  # no bid adjustment -> omitted
+    cc1 = request.campaign_criterions[1]
+    assert cc1.criterion_bid.type == "BidMultiplier" and cc1.criterion_bid.multiplier == 10.0
+
+
+def test_add_ad_schedules_sets_searcher_time_zone_flag_after_add() -> None:
+    add_resp = SimpleNamespace(campaign_criterion_ids=["1"], nested_partial_errors=[])
+    tz_resp = SimpleNamespace(partial_errors=[])
+    client = _SequencedClient(add_resp, tz_resp)
+    schedules = [AdScheduleInput(day="Monday", from_hour=0, to_hour=24)]
+    result = criteria.add_ad_schedules(
+        client, campaign_id="1", schedules=schedules, use_searcher_time_zone=True
+    )
+    assert result.ok
+    # The windows are added first; the campaign flag is only flipped once they land.
+    assert client.calls[0][1] == "add_campaign_criterions"
+    assert client.calls[1][1] == "update_campaigns"
+    assert client.calls[1][2].campaigns[0].ad_schedule_use_searcher_time_zone is True
+
+
+def test_add_ad_schedules_leaves_time_zone_flag_unchanged_when_add_fails() -> None:
+    # The add returns partial errors and no ids -> creation failed.
+    add_resp = SimpleNamespace(
+        campaign_criterion_ids=[], nested_partial_errors=[SimpleNamespace(message="bad")]
+    )
+    client = _FakeClient(add_resp)
+    schedules = [AdScheduleInput(day="Monday", from_hour=0, to_hour=24)]
+    result = criteria.add_ad_schedules(
+        client, campaign_id="1", schedules=schedules, use_searcher_time_zone=True
+    )
+    assert not result.ok
+    # Only the add was attempted; the campaign time-zone flag was never touched.
+    assert [c[1] for c in client.calls] == ["add_campaign_criterions"]
+
+
+def test_add_ad_schedules_rejects_off_grid_minute() -> None:
+    client = _FakeClient(SimpleNamespace(campaign_criterion_ids=[], nested_partial_errors=[]))
+    with pytest.raises(ValueError, match="15-minute granularity"):
+        criteria.add_ad_schedules(
+            client,
+            campaign_id="1",
+            schedules=[AdScheduleInput(day="Monday", from_hour=9, from_minute=10, to_hour=17)],
+        )
+
+
+def test_add_ad_schedules_off_grid_minute_does_not_touch_time_zone_flag() -> None:
+    # An off-grid minute must fail during validation, before any API call (so the time-zone flag
+    # cannot be flipped even when use_searcher_time_zone is requested alongside the bad input).
+    client = _FakeClient(SimpleNamespace(campaign_criterion_ids=[], nested_partial_errors=[]))
+    with pytest.raises(ValueError, match="15-minute granularity"):
+        criteria.add_ad_schedules(
+            client,
+            campaign_id="1",
+            schedules=[AdScheduleInput(day="Monday", from_hour=9, from_minute=10, to_hour=17)],
+            use_searcher_time_zone=True,
+        )
+    assert client.calls == []
+
+
+def test_remove_ad_schedules_passes_targets_type() -> None:
+    client = _FakeClient(SimpleNamespace(partial_errors=[]))
+    result = criteria.remove_ad_schedules(client, campaign_id="1", criterion_ids=["901", "902"])
+    assert result.ok and result.ids == ["901", "902"]
+    request = client.calls[0][2]
+    assert request.criterion_type.name == "TARGETS"
+    assert request.campaign_criterion_ids == ["901", "902"]
+
+
+def _device_criterion(criterion_id: str, device: str, multiplier: float = 0.0) -> Any:
+    crit = SimpleNamespace(type="DeviceCriterion", device_name=device, os_name=None)
+    bid = SimpleNamespace(type="BidMultiplier", multiplier=multiplier)
+    return SimpleNamespace(
+        id=criterion_id, campaign_id="487928625", criterion=crit, criterion_bid=bid
+    )
+
+
+def test_get_device_bid_adjustments_reads_devices() -> None:
+    resp = SimpleNamespace(
+        campaign_criterions=[
+            _device_criterion("11", "Computers", 0.0),
+            _device_criterion("12", "Smartphones", 40.0),
+            _device_criterion("13", "Tablets", -100.0),
+        ]
+    )
+    client = _FakeClient(resp)
+    rows = criteria.get_device_bid_adjustments(client, campaign_id="487928625")
+    assert [r.device for r in rows] == ["Computers", "Smartphones", "Tablets"]
+    mobile = next(r for r in rows if r.device == "Smartphones")
+    assert mobile.bid_adjustment == 40.0 and mobile.criterion_id == "12"
+    assert client.calls[0][1] == "get_campaign_criterions_by_ids"
+    assert client.calls[0][2].criterion_type.name == "DEVICE"  # read uses the specific Device type
+
+
+def test_set_device_bid_adjustment_updates_existing_in_place() -> None:
+    # All three device criterions already exist -> the target is updated in place (under Targets),
+    # and "mobile" resolves to Microsoft's "Smartphones".
+    get_resp = SimpleNamespace(
+        campaign_criterions=[
+            _device_criterion("11", "Computers"),
+            _device_criterion("12", "Smartphones"),
+            _device_criterion("13", "Tablets"),
+        ]
+    )
+    update_resp = SimpleNamespace(nested_partial_errors=[])
+    client = _SequencedClient(get_resp, update_resp)
+    result = criteria.set_device_bid_adjustment(
+        client, campaign_id="487928625", device="mobile", bid_adjustment=40.0
+    )
+    assert result.ok and result.ids == ["12"]
+    assert client.calls[0][1] == "get_campaign_criterions_by_ids"
+    _, method, request = client.calls[1]
+    assert method == "update_campaign_criterions"
+    assert request.criterion_type.name == "TARGETS"  # updates use the umbrella Targets type
+    cc = request.campaign_criterions[0]
+    assert cc.id == "12" and cc.criterion.type == "DeviceCriterion"
+    assert cc.criterion.device_name == "Smartphones"
+    assert cc.criterion_bid.type == "BidMultiplier" and cc.criterion_bid.multiplier == 40.0
+
+
+def test_set_device_bid_adjustment_adds_all_three_when_none_exist() -> None:
+    # A campaign with no device criterions: Microsoft requires the set, so all three are added
+    # together, the target carrying the multiplier and the others a neutral 0.
+    get_resp = SimpleNamespace(campaign_criterions=[])
+    add_resp = SimpleNamespace(campaign_criterion_ids=["21", "22", "23"], nested_partial_errors=[])
+    client = _SequencedClient(get_resp, add_resp)
+    result = criteria.set_device_bid_adjustment(
+        client, campaign_id="1", device="Smartphones", bid_adjustment=30.0
+    )
+    assert result.ok and result.ids == ["21", "22", "23"]
+    _, method, request = client.calls[1]
+    assert method == "add_campaign_criterions"
+    assert request.criterion_type.name == "TARGETS"
+    by_device = {
+        cc.criterion.device_name: cc.criterion_bid.multiplier for cc in request.campaign_criterions
+    }
+    assert by_device == {"Computers": 0.0, "Smartphones": 30.0, "Tablets": 0.0}
+
+
+def test_set_device_bid_adjustment_rejects_out_of_range() -> None:
+    client = _FakeClient(SimpleNamespace(campaign_criterions=[]))
+    with pytest.raises(ValueError, match="between -100 and 900"):
+        criteria.set_device_bid_adjustment(
+            client, campaign_id="1", device="Smartphones", bid_adjustment=950
+        )
+
+
+def test_set_device_bid_adjustment_rejects_unknown_device() -> None:
+    client = _FakeClient(SimpleNamespace(campaign_criterions=[]))
+    with pytest.raises(ValueError, match="Computers, Smartphones, Tablets"):
+        criteria.set_device_bid_adjustment(
+            client, campaign_id="1", device="Smartwatch", bid_adjustment=10
+        )
+
+
+def test_set_device_bid_adjustment_tool_schema_accepts_aliases() -> None:
+    # Regression: the device param must NOT be a strict enum in the tool schema, or aliases like
+    # "mobile" are rejected by input validation before the handler can normalize them.
+    import asyncio
+
+    from microsoft_ads_mcp.config import Settings
+    from microsoft_ads_mcp.server import create_server
+
+    settings = Settings(
+        developer_token="d", client_id="c", refresh_token="r", account_id="1", read_only=False
+    )
+    tools = asyncio.run(create_server(settings).list_tools())
+    tool = next(t for t in tools if t.name == "set_device_bid_adjustment")
+    device_schema = tool.parameters["properties"]["device"]
+    assert device_schema["type"] == "string"
+    assert "enum" not in device_schema  # a strict enum would block the documented aliases
 
 
 def test_bulk_download_entities_mapping() -> None:

@@ -9,7 +9,10 @@ from mcp.types import ToolAnnotations
 
 from ..api.client import get_client
 from ..domain.entities import (
+    AdScheduleInput,
     CampaignStatus,
+    ConversionCountType,
+    ConversionRevenueType,
     IntentOption,
     MatchType,
     MutationResult,
@@ -84,6 +87,7 @@ def register(mcp: FastMCP) -> None:
         daily_budget: float | None = None,
         status: CampaignStatus | None = None,
         bid_strategy_id: str | None = None,
+        time_zone: str | None = None,
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
         url_custom_parameters: dict[str, str] | None = None,
@@ -96,6 +100,8 @@ def register(mcp: FastMCP) -> None:
             daily_budget: New daily budget in account currency.
             status: "Active" or "Paused".
             bid_strategy_id: Id of a portfolio bid strategy to apply.
+            time_zone: Campaign time zone (Microsoft code, e.g. "CentralTimeUSCanada"); ad
+                schedules run in this zone. Read the current value from get_campaigns.
             tracking_url_template: Tracking template for all URLs in the campaign.
             final_url_suffix: Final URL suffix appended to landing-page URLs.
             url_custom_parameters: {key: value} URL custom parameters, referenced in
@@ -109,6 +115,7 @@ def register(mcp: FastMCP) -> None:
                 daily_budget=daily_budget,
                 status=status,
                 bid_strategy_id=bid_strategy_id,
+                time_zone=time_zone,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,
                 url_custom_parameters=url_custom_parameters,
@@ -613,15 +620,56 @@ def register(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
-    def update_conversion_goal(goal_id: str, name: str) -> MutationResult:
-        """Rename a conversion goal in place.
+    def update_conversion_goal(
+        goal_id: str,
+        name: str | None = None,
+        status: CampaignStatus | None = None,
+        exclude_from_bidding: bool | None = None,
+        count_type: ConversionCountType | None = None,
+        conversion_window_in_minutes: int | None = None,
+        revenue_type: ConversionRevenueType | None = None,
+        revenue_value: float | None = None,
+        revenue_currency_code: str | None = None,
+    ) -> MutationResult:
+        """Update a conversion goal in place. Only the fields you pass change.
+
+        The key bidding lever is `exclude_from_bidding` — the inverse of the web UI's "Include in
+        conversions" checkbox. `exclude_from_bidding=false` keeps the goal in the Conversions
+        column and in automated-bidding math (ECPC / tCPA); `true` drops it from both (it still
+        reports under All conversions). Confirm this is false before relying on a goal to steer
+        spend. Read the current values first with get_conversion_goals.
 
         Args:
             goal_id: The conversion goal id (from get_conversion_goals).
-            name: The new goal name.
+            name: New goal name (rename).
+            status: "Active" or "Paused" (a paused goal stops recording conversions).
+            exclude_from_bidding: false = include the goal in the Conversions column and automated
+                bidding; true = exclude it from both (still tracked under All conversions).
+            count_type: How conversions are counted per click — "All" (every conversion) or
+                "Unique" (one per click).
+            conversion_window_in_minutes: Click-to-conversion lookback window in minutes (e.g.
+                43200 = 30 days).
+            revenue_type: Conversion value model — "FixedValue" (same value each time, requires
+                revenue_value), "VariableValue" (value sent with the event), or "NoValue". Revenue
+                fields are merged onto the goal's current revenue, so you can change one without
+                re-stating the others.
+            revenue_value: Revenue amount (required for "FixedValue"; the default for
+                "VariableValue").
+            revenue_currency_code: ISO currency code for the revenue value, e.g. "USD".
         """
         return guarded(
-            lambda: conversions.update_conversion_goal(get_client(), goal_id=goal_id, name=name)
+            lambda: conversions.update_conversion_goal(
+                get_client(),
+                goal_id=goal_id,
+                name=name,
+                status=status,
+                exclude_from_bidding=exclude_from_bidding,
+                count_type=count_type,
+                conversion_window_in_minutes=conversion_window_in_minutes,
+                revenue_type=revenue_type,
+                revenue_value=revenue_value,
+                revenue_currency_code=revenue_currency_code,
+            )
         )
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
@@ -692,6 +740,34 @@ def register(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def set_device_bid_adjustment(
+        campaign_id: str, device: str, bid_adjustment: float
+    ) -> MutationResult:
+        """Set a campaign's bid adjustment for one device (e.g. a mobile modifier).
+
+        Microsoft calls mobile "Smartphones" (there is no "Mobile"); "Computers" is desktop/laptop.
+        Device criterions are created as a set, so the first time you set any device this also
+        creates the other two at a neutral 0. Read the current values first with
+        get_device_bid_adjustments.
+
+        Args:
+            campaign_id: The campaign id.
+            device: The device to adjust. Canonical values are "Computers", "Smartphones", and
+                "Tablets"; the friendly aliases "mobile" (-> Smartphones), "desktop"/"pc" (->
+                Computers), and "tablet" are also accepted (case-insensitive).
+            bid_adjustment: Percent modifier from -100 to 900 (e.g. 40 = +40%); -100 excludes the
+                device from serving entirely.
+        """
+        return guarded(
+            lambda: criteria.set_device_bid_adjustment(
+                get_client(),
+                campaign_id=campaign_id,
+                device=device,
+                bid_adjustment=bid_adjustment,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
     def remove_location_targets(campaign_id: str, criterion_ids: list[str]) -> MutationResult:
         """Remove location targets/exclusions from a campaign by criterion id.
 
@@ -701,6 +777,52 @@ def register(mcp: FastMCP) -> None:
         """
         return guarded(
             lambda: criteria.remove_location_targets(
+                get_client(), campaign_id=campaign_id, criterion_ids=criterion_ids
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def add_ad_schedules(
+        campaign_id: str,
+        schedules: list[AdScheduleInput],
+        use_searcher_time_zone: bool | None = None,
+    ) -> MutationResult:
+        """Add ad-schedule (dayparting) windows to a campaign.
+
+        Each window restricts serving to one day and time range and is additive (a campaign with
+        no schedule serves all hours). Hours are 0-24; minutes are 15-minute granularity, so only
+        0/15/30/45 are valid (e.g. 09:15-16:45 -> from_hour 9, from_minute 15, to_hour 16,
+        to_minute 45). Times run in the campaign time zone (see get_campaigns / get_ad_schedules)
+        unless you pass use_searcher_time_zone=true. Read existing windows with get_ad_schedules
+        first to avoid duplicates.
+
+        Args:
+            campaign_id: The campaign id.
+            schedules: Windows to add, each {day, from_hour, from_minute, to_hour, to_minute,
+                bid_adjustment}. day is "Monday".."Sunday"; bid_adjustment is a percent modifier
+                (0 = no change).
+            use_searcher_time_zone: If set, also updates the campaign flag controlling whether the
+                hours are interpreted in each searcher's time zone (true) or the campaign's (false).
+        """
+        return guarded(
+            lambda: criteria.add_ad_schedules(
+                get_client(),
+                campaign_id=campaign_id,
+                schedules=schedules,
+                use_searcher_time_zone=use_searcher_time_zone,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def remove_ad_schedules(campaign_id: str, criterion_ids: list[str]) -> MutationResult:
+        """Remove ad-schedule (dayparting) windows from a campaign by criterion id.
+
+        Args:
+            campaign_id: The campaign id.
+            criterion_ids: Campaign criterion ids (from get_ad_schedules).
+        """
+        return guarded(
+            lambda: criteria.remove_ad_schedules(
                 get_client(), campaign_id=campaign_id, criterion_ids=criterion_ids
             )
         )

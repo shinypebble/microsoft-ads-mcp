@@ -13,9 +13,11 @@ from ..domain.entities import (
     AccountUrlOptions,
     AdExtensionSummary,
     AdGroupSummary,
+    AdScheduleSettings,
     AdSummary,
     CampaignSummary,
     ConversionGoalSummary,
+    DeviceBidAdjustmentSummary,
     KeywordSummary,
     LocationCriterionSummary,
     LocationIntentSummary,
@@ -147,6 +149,14 @@ def register(mcp: FastMCP) -> None:
     def get_conversion_goals(goal_ids: list[str] | None = None) -> list[ConversionGoalSummary]:
         """List conversion goals (all types). Pass goal_ids to fetch specific goals.
 
+        Each goal reports `exclude_from_bidding` — the inverse of the UI's "Include in
+        conversions" checkbox and the single switch for whether the goal steers automated
+        bidding: false means it counts in the Conversions column and ECPC/tCPA bid math, true
+        means it only shows under All conversions. Also surfaces `count_type` (All/Unique),
+        `conversion_window_in_minutes`, `goal_category`, and the revenue model (`revenue_type` /
+        `revenue_value` / `revenue_currency_code`). Confirm `exclude_from_bidding` is false before
+        relying on a goal to drive spend; flip it with update_conversion_goal.
+
         Args:
             goal_ids: Optional conversion goal ids; omit to list all goals in the account.
         """
@@ -206,6 +216,35 @@ def register(mcp: FastMCP) -> None:
             campaign_id: The campaign id.
         """
         return guarded(lambda: criteria.get_location_intent(get_client(), campaign_id=campaign_id))
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_ad_schedules(campaign_id: str) -> AdScheduleSettings:
+        """Read a campaign's ad-schedule (dayparting) windows and their time-zone context.
+
+        Returns each window (`day`, `from_hour`/`from_minute`, `to_hour`/`to_minute`,
+        `bid_adjustment`) plus the campaign's `time_zone` and `use_searcher_time_zone` flag. When
+        `use_searcher_time_zone` is false, the hours run in the campaign `time_zone`; remove a
+        window with `remove_ad_schedules` using its `criterion_id`.
+
+        Args:
+            campaign_id: The campaign id.
+        """
+        return guarded(lambda: criteria.get_ad_schedules(get_client(), campaign_id=campaign_id))
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_device_bid_adjustments(campaign_id: str) -> list[DeviceBidAdjustmentSummary]:
+        """Read a campaign's device bid adjustments (Computers / Smartphones / Tablets).
+
+        Each row's `bid_adjustment` is a percent modifier (-100 to 900; -100 excludes the device).
+        An empty list means no device modifier is set, so every device serves at the base bid.
+        Note Microsoft calls mobile "Smartphones". Set one with `set_device_bid_adjustment`.
+
+        Args:
+            campaign_id: The campaign id.
+        """
+        return guarded(
+            lambda: criteria.get_device_bid_adjustments(get_client(), campaign_id=campaign_id)
+        )
 
     @mcp.tool(tags={"read"}, annotations=_READ)
     def resolve_postal_codes(

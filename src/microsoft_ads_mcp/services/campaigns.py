@@ -13,6 +13,9 @@ from openapi_client.models.campaign.get_ads_by_ad_group_id_request import (
 from openapi_client.models.campaign.get_campaigns_by_account_id_request import (
     GetCampaignsByAccountIdRequest,
 )
+from openapi_client.models.campaign.get_campaigns_by_ids_request import (
+    GetCampaignsByIdsRequest,
+)
 from openapi_client.models.campaign.get_keywords_by_ad_group_id_request import (
     GetKeywordsByAdGroupIdRequest,
 )
@@ -34,13 +37,40 @@ def get_campaigns(client: MsAdsClient, *, include_deleted: bool = False) -> list
     resp = client.call(
         CAMPAIGN,
         "get_campaigns_by_account_id",
-        GetCampaignsByAccountIdRequest(account_id=client.account_id, campaign_type="Search"),
+        # AdScheduleUseSearcherTimeZone is not returned by default; request it so the dayparting
+        # time-zone context is visible (TimeZone / BiddingScheme come back without asking).
+        GetCampaignsByAccountIdRequest(
+            account_id=client.account_id,
+            campaign_type="Search",
+            return_additional_fields="AdScheduleUseSearcherTimeZone",
+        ),
     )
     items = as_list(_unwrap(first_attr(resp, "Campaigns", "campaigns"), "Campaign", "campaign"))
     out = [CampaignSummary.from_sdk(c) for c in items]
     if not include_deleted:
         out = [c for c in out if c.status != "Deleted"]
     return out
+
+
+def get_campaign_by_id(client: MsAdsClient, campaign_id: str) -> CampaignSummary | None:
+    """Fetch a single campaign by id, or ``None`` if it does not exist.
+
+    Mirrors ``get_campaigns``' request shape -- notably requesting AdScheduleUseSearcherTimeZone,
+    which the API omits by default -- but reads just this campaign (GetCampaignsByIds) instead of
+    listing the whole account to pull one campaign's context.
+    """
+    resp = client.call(
+        CAMPAIGN,
+        "get_campaigns_by_ids",
+        GetCampaignsByIdsRequest(
+            account_id=client.account_id,
+            campaign_ids=[campaign_id],
+            campaign_type="Search",
+            return_additional_fields="AdScheduleUseSearcherTimeZone",
+        ),
+    )
+    items = as_list(_unwrap(first_attr(resp, "Campaigns", "campaigns"), "Campaign", "campaign"))
+    return CampaignSummary.from_sdk(items[0]) if items else None
 
 
 def get_ad_groups(client: MsAdsClient, campaign_id: str) -> list[AdGroupSummary]:
