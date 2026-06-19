@@ -1,0 +1,26 @@
+skill/microsoft-ads-optimizer/SKILL.md
+  s_f40a7d29533141::t_46b60728336852 62-65
+  s_f40a7d29533141::t_f4eafe4f862761 22-48
+  s_f40a7d29533141::t_2dbacf1676059d 95-98
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "f9f9ddf333d0cee46a012ddcc811d304eee3d72a",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_f40a7d29533141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad2bbbe9-b0a2-459e-b70e-a5c4ae05153f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
