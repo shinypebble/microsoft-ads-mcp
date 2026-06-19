@@ -33,6 +33,7 @@ WRITE_TOOLS = {
     "add_location_targets",
     "remove_location_targets",
     "bulk_upload",
+    "set_account_url_options",
 }
 READ_TOOLS = {
     "account_health",
@@ -51,6 +52,7 @@ READ_TOOLS = {
     "resolve_postal_codes",
     "bulk_download",
     "run_performance_report",
+    "get_account_url_options",
 }
 
 

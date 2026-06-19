@@ -9,7 +9,15 @@ from mcp.types import ToolAnnotations
 
 from ..api.client import get_client
 from ..domain.entities import CampaignStatus, MatchType, MutationResult, NegativeEntityType
-from ..services import bulk, conversions, criteria, extensions, mutations, negatives
+from ..services import (
+    account_properties,
+    bulk,
+    conversions,
+    criteria,
+    extensions,
+    mutations,
+    negatives,
+)
 from ._common import guarded
 
 _WRITE = ToolAnnotations(readOnlyHint=False)
@@ -23,6 +31,7 @@ def register(mcp: FastMCP) -> None:
         description: str = "",
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
+        url_custom_parameters: dict[str, str] | None = None,
     ) -> MutationResult:
         """Create a Search campaign (PAUSED by default for safety).
 
@@ -33,6 +42,8 @@ def register(mcp: FastMCP) -> None:
             tracking_url_template: Optional tracking template applied to all URLs in the
                 campaign (e.g. "{lpurl}?utm_source=bing").
             final_url_suffix: Optional Final URL suffix appended to landing-page URLs.
+            url_custom_parameters: Optional {key: value} URL custom parameters, referenced in
+                templates/suffixes as {_key} (e.g. {"src": "bing"}).
         """
         return guarded(
             lambda: mutations.create_campaign(
@@ -42,6 +53,7 @@ def register(mcp: FastMCP) -> None:
                 description=description,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,
+                url_custom_parameters=url_custom_parameters,
             )
         )
 
@@ -68,6 +80,7 @@ def register(mcp: FastMCP) -> None:
         bid_strategy_id: str | None = None,
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
+        url_custom_parameters: dict[str, str] | None = None,
     ) -> MutationResult:
         """Update an existing campaign in place. Only the fields you pass change.
 
@@ -79,6 +92,8 @@ def register(mcp: FastMCP) -> None:
             bid_strategy_id: Id of a portfolio bid strategy to apply.
             tracking_url_template: Tracking template for all URLs in the campaign.
             final_url_suffix: Final URL suffix appended to landing-page URLs.
+            url_custom_parameters: {key: value} URL custom parameters, referenced in
+                templates/suffixes as {_key}.
         """
         return guarded(
             lambda: mutations.update_campaign(
@@ -90,6 +105,7 @@ def register(mcp: FastMCP) -> None:
                 bid_strategy_id=bid_strategy_id,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,
+                url_custom_parameters=url_custom_parameters,
             )
         )
 
@@ -101,6 +117,7 @@ def register(mcp: FastMCP) -> None:
         language: str = "English",
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
+        url_custom_parameters: dict[str, str] | None = None,
     ) -> MutationResult:
         """Create an ad group (PAUSED) in a campaign.
 
@@ -111,6 +128,8 @@ def register(mcp: FastMCP) -> None:
             language: Ad group language (required by Microsoft; default "English").
             tracking_url_template: Optional tracking template for URLs in the ad group.
             final_url_suffix: Optional Final URL suffix appended to landing-page URLs.
+            url_custom_parameters: Optional {key: value} URL custom parameters, referenced in
+                templates/suffixes as {_key}.
         """
         return guarded(
             lambda: mutations.create_ad_group(
@@ -121,6 +140,7 @@ def register(mcp: FastMCP) -> None:
                 language=language,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,
+                url_custom_parameters=url_custom_parameters,
             )
         )
 
@@ -133,6 +153,7 @@ def register(mcp: FastMCP) -> None:
         cpc_bid: float | None = None,
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
+        url_custom_parameters: dict[str, str] | None = None,
     ) -> MutationResult:
         """Update an existing ad group in place. Only the fields you pass change.
 
@@ -144,6 +165,8 @@ def register(mcp: FastMCP) -> None:
             cpc_bid: New default CPC bid in account currency.
             tracking_url_template: Tracking template for URLs in the ad group.
             final_url_suffix: Final URL suffix appended to landing-page URLs.
+            url_custom_parameters: {key: value} URL custom parameters, referenced in
+                templates/suffixes as {_key}.
         """
         return guarded(
             lambda: mutations.update_ad_group(
@@ -155,6 +178,7 @@ def register(mcp: FastMCP) -> None:
                 cpc_bid=cpc_bid,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,
+                url_custom_parameters=url_custom_parameters,
             )
         )
 
@@ -164,6 +188,9 @@ def register(mcp: FastMCP) -> None:
         keywords: list[str],
         match_type: MatchType = "Broad",
         default_bid: float = 1.0,
+        tracking_url_template: str | None = None,
+        final_url_suffix: str | None = None,
+        url_custom_parameters: dict[str, str] | None = None,
     ) -> MutationResult:
         """Add keywords (Active) to an ad group.
 
@@ -172,6 +199,11 @@ def register(mcp: FastMCP) -> None:
             keywords: Keyword texts to add.
             match_type: "Broad", "Phrase", or "Exact" (default "Broad").
             default_bid: Default CPC bid in account currency (default 1.0).
+            tracking_url_template: Optional keyword-level tracking template (applies to every
+                keyword in this batch; overrides ad-group/campaign templates).
+            final_url_suffix: Optional Final URL suffix (applies to every keyword in this batch).
+            url_custom_parameters: Optional {key: value} URL custom parameters, referenced in
+                templates/suffixes as {_key} (applies to every keyword in this batch).
         """
         return guarded(
             lambda: mutations.add_keywords(
@@ -180,6 +212,9 @@ def register(mcp: FastMCP) -> None:
                 keywords=keywords,
                 match_type=match_type,
                 default_bid=default_bid,
+                tracking_url_template=tracking_url_template,
+                final_url_suffix=final_url_suffix,
+                url_custom_parameters=url_custom_parameters,
             )
         )
 
@@ -191,6 +226,9 @@ def register(mcp: FastMCP) -> None:
         match_type: MatchType | None = None,
         status: CampaignStatus | None = None,
         final_url: str | None = None,
+        tracking_url_template: str | None = None,
+        final_url_suffix: str | None = None,
+        url_custom_parameters: dict[str, str] | None = None,
     ) -> MutationResult:
         """Update an existing keyword in place. Only the fields you pass change.
 
@@ -201,6 +239,10 @@ def register(mcp: FastMCP) -> None:
             match_type: "Broad", "Phrase", or "Exact".
             status: "Active" or "Paused".
             final_url: New keyword-level Final URL.
+            tracking_url_template: Keyword-level tracking template (overrides ad-group/campaign).
+            final_url_suffix: Keyword-level Final URL suffix.
+            url_custom_parameters: {key: value} URL custom parameters, referenced in
+                templates/suffixes as {_key}.
         """
         return guarded(
             lambda: mutations.update_keyword(
@@ -211,6 +253,9 @@ def register(mcp: FastMCP) -> None:
                 match_type=match_type,
                 status=status,
                 final_url=final_url,
+                tracking_url_template=tracking_url_template,
+                final_url_suffix=final_url_suffix,
+                url_custom_parameters=url_custom_parameters,
             )
         )
 
@@ -224,6 +269,7 @@ def register(mcp: FastMCP) -> None:
         path2: str = "",
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
+        url_custom_parameters: dict[str, str] | None = None,
     ) -> MutationResult:
         """Create a Responsive Search Ad (PAUSED).
 
@@ -236,6 +282,8 @@ def register(mcp: FastMCP) -> None:
             path2: Optional display URL path 2 (max 15 chars).
             tracking_url_template: Optional tracking template for this ad's URLs.
             final_url_suffix: Optional Final URL suffix appended to landing-page URLs.
+            url_custom_parameters: Optional {key: value} URL custom parameters, referenced in
+                templates/suffixes as {_key}.
         """
         return guarded(
             lambda: mutations.create_responsive_search_ad(
@@ -248,6 +296,7 @@ def register(mcp: FastMCP) -> None:
                 path2=path2,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,
+                url_custom_parameters=url_custom_parameters,
             )
         )
 
@@ -263,6 +312,7 @@ def register(mcp: FastMCP) -> None:
         status: CampaignStatus | None = None,
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
+        url_custom_parameters: dict[str, str] | None = None,
     ) -> MutationResult:
         """Update an existing Responsive Search Ad in place. Only the fields you pass change.
 
@@ -279,6 +329,8 @@ def register(mcp: FastMCP) -> None:
             status: "Active" or "Paused".
             tracking_url_template: Tracking template for this ad's URLs.
             final_url_suffix: Final URL suffix appended to landing-page URLs.
+            url_custom_parameters: {key: value} URL custom parameters, referenced in
+                templates/suffixes as {_key}.
         """
         return guarded(
             lambda: mutations.update_responsive_search_ad(
@@ -293,6 +345,38 @@ def register(mcp: FastMCP) -> None:
                 status=status,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,
+                url_custom_parameters=url_custom_parameters,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def set_account_url_options(
+        tracking_url_template: str | None = None,
+        final_url_suffix: str | None = None,
+        msclkid_auto_tagging_enabled: bool | None = None,
+        ad_click_parallel_tracking: bool | None = None,
+    ) -> MutationResult:
+        """Set account-level URL options (applies account-wide; every campaign inherits them).
+
+        The cleanest way to apply a tracking template / Final URL suffix across the whole account
+        at once, instead of editing each campaign/ad/keyword. Only the fields you pass change.
+        Read the current values first with get_account_url_options.
+
+        Args:
+            tracking_url_template: Account tracking template, e.g.
+                "{lpurl}?utm_source=bing&utm_medium=cpc&utm_campaign={campaign}". Pass "" to clear.
+            final_url_suffix: Account Final URL suffix appended to landing-page URLs ("" clears).
+            msclkid_auto_tagging_enabled: Whether to auto-append the Microsoft Click ID (msclkid)
+                used for conversion attribution.
+            ad_click_parallel_tracking: Whether to enable parallel tracking.
+        """
+        return guarded(
+            lambda: account_properties.set_account_url_options(
+                get_client(),
+                tracking_url_template=tracking_url_template,
+                final_url_suffix=final_url_suffix,
+                msclkid_auto_tagging_enabled=msclkid_auto_tagging_enabled,
+                ad_click_parallel_tracking=ad_click_parallel_tracking,
             )
         )
 
@@ -303,9 +387,7 @@ def register(mcp: FastMCP) -> None:
         Args:
             campaign_ids: The campaign ids to delete.
         """
-        return guarded(
-            lambda: mutations.delete_campaigns(get_client(), campaign_ids=campaign_ids)
-        )
+        return guarded(lambda: mutations.delete_campaigns(get_client(), campaign_ids=campaign_ids))
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
     def delete_ad_group(campaign_id: str, ad_group_ids: list[str]) -> MutationResult:

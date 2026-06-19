@@ -3,8 +3,10 @@ python = ".venv"
 
 [src]
 # The generated msads/openapi_client package is untyped third-party code; we only
-# type-check our own package.
-include = ["src", "tests"]
+# type-check our own package. Tests are excluded: they pass duck-typed fake clients
+# (``_FakeClient`` etc.) where ``MsAdsClient`` is declared, which ty flags nominally even
+# though that substitution is intentional and exercised at runtime.
+include = ["src"]
 
 # The services layer constructs the SDK's OpenAPI-generated Pydantic models (Campaign,
 # AddCampaignsRequest, ...). Those models ship untyped, so ty cannot see their field-based

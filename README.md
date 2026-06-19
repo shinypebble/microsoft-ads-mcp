@@ -115,7 +115,13 @@ deterministically instead of pattern-matching an error string.
 calls hit), `get_campaigns`, `get_ad_groups`, `get_keywords`, `get_ads` (includes the RSA copy:
 headlines / descriptions / paths), `get_budgets`, `get_negative_keywords`, `get_ad_extensions`,
 `get_conversion_goals`, `get_uet_tags`, `get_location_targets`, `resolve_postal_codes`
-(ZIP → Microsoft LocationId), `bulk_download`.
+(ZIP → Microsoft LocationId), `bulk_download`, `get_account_url_options`. The hierarchy reads
+(`get_campaigns`, `get_ad_groups`, `get_ads`, `get_keywords`) also surface each entity's URL
+tracking — `tracking_url_template`, `final_url_suffix`, and `url_custom_parameters`. A `null`
+template at a level usually means it inherits the **account-level** default, which
+`get_account_url_options` returns (tracking template, Final URL suffix, and
+`msclkid_auto_tagging_enabled` — the Microsoft Click ID that drives attribution). Confirm these
+before activating paused campaigns rather than assuming the per-campaign blanks mean "untracked".
 
 **Reporting** — `run_performance_report` (submit → poll → download → parse, returns rows),
 covering campaign / keyword / search-query / geographic reports. Supports a predefined
@@ -127,8 +133,12 @@ covering campaign / keyword / search-query / geographic reports. Supports a pred
 - *Campaigns, ad groups, ads, keywords* — `create_campaign`, `update_campaign`,
   `update_campaign_status`, `create_ad_group`, `update_ad_group`, `create_responsive_search_ad`,
   `update_responsive_search_ad`, `add_keywords`, `update_keyword`, `delete_campaign`,
-  `delete_ad_group`, `delete_ad`, `delete_keyword`. Create/update accept `tracking_url_template`
-  and `final_url_suffix`.
+  `delete_ad_group`, `delete_ad`, `delete_keyword`. Create/update at every level (campaign, ad
+  group, ad, keyword) accept `tracking_url_template`, `final_url_suffix`, and
+  `url_custom_parameters` (a `{key: value}` map, referenced in templates as `{_key}`).
+- *Account-level URL options* — `set_account_url_options` sets the tracking template, Final URL
+  suffix, and `msclkid` auto-tagging once for the whole account (every campaign inherits them) —
+  the cleanest single-point lever for an account-wide tracking/rebrand change.
 - *Negative keywords* — `add_negative_keywords`, `remove_negative_keywords` (campaign or ad-group
   scope).
 - *Ad extensions* — `add_call_extension`, `update_call_extension`, `add_callout_extension`,
@@ -165,6 +175,7 @@ src/microsoft_ads_mcp/
     entities.py        # lean Pydantic summary/report models for tool outputs
   services/
     accounts.py        # user/account reads (CustomerManagementService)
+    account_properties.py  # account-level URL options (CampaignManagementService AccountProperties)
     campaigns.py       # hierarchy + list reads
     mutations.py       # create/update/delete for campaigns, ad groups, ads, keywords
     negatives.py       # negative-keyword add/list/remove

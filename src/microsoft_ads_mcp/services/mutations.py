@@ -16,6 +16,8 @@ from openapi_client.models.campaign.add_keywords_request import AddKeywordsReque
 from openapi_client.models.campaign.asset_link import AssetLink
 from openapi_client.models.campaign.bid import Bid
 from openapi_client.models.campaign.campaign import Campaign
+from openapi_client.models.campaign.custom_parameter import CustomParameter
+from openapi_client.models.campaign.custom_parameters import CustomParameters
 from openapi_client.models.campaign.delete_ad_groups_request import DeleteAdGroupsRequest
 from openapi_client.models.campaign.delete_ads_request import DeleteAdsRequest
 from openapi_client.models.campaign.delete_campaigns_request import DeleteCampaignsRequest
@@ -66,6 +68,17 @@ def _validate_status(status: str | None) -> None:
         raise ValueError("status must be 'Active' or 'Paused'")
 
 
+def _custom_parameters(params: dict[str, str] | None) -> CustomParameters | None:
+    """Wrap a plain ``{key: value}`` dict as the SDK's ``UrlCustomParameters``.
+
+    Keys are referenced in tracking templates / Final URL suffixes as ``{_key}``. Returns None
+    for a missing/empty dict so the field is omitted from a partial update (left unchanged).
+    """
+    if not params:
+        return None
+    return CustomParameters(parameters=[CustomParameter(key=k, value=v) for k, v in params.items()])
+
+
 def create_campaign(
     client: MsAdsClient,
     *,
@@ -74,6 +87,7 @@ def create_campaign(
     description: str = "",
     tracking_url_template: str | None = None,
     final_url_suffix: str | None = None,
+    url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
     """Create a paused Search campaign with a daily budget."""
     campaign = Campaign(
@@ -85,7 +99,9 @@ def create_campaign(
         time_zone="EasternTimeUSCanada",
         campaign_type="Search",
         **_present(
-            tracking_url_template=tracking_url_template, final_url_suffix=final_url_suffix
+            tracking_url_template=tracking_url_template,
+            final_url_suffix=final_url_suffix,
+            url_custom_parameters=_custom_parameters(url_custom_parameters),
         ),
     )
     resp = client.call(
@@ -147,6 +163,7 @@ def create_ad_group(
     language: str = "English",
     tracking_url_template: str | None = None,
     final_url_suffix: str | None = None,
+    url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
     """Create a paused ad group with a default CPC bid.
 
@@ -159,7 +176,9 @@ def create_ad_group(
         cpc_bid=Bid(amount=cpc_bid),
         language=language,
         **_present(
-            tracking_url_template=tracking_url_template, final_url_suffix=final_url_suffix
+            tracking_url_template=tracking_url_template,
+            final_url_suffix=final_url_suffix,
+            url_custom_parameters=_custom_parameters(url_custom_parameters),
         ),
     )
     resp = client.call(
@@ -188,10 +207,27 @@ def add_keywords(
     keywords: list[str],
     match_type: MatchType = "Broad",
     default_bid: float = 1.0,
+    tracking_url_template: str | None = None,
+    final_url_suffix: str | None = None,
+    url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
-    """Add keywords (active) with a default bid and match type."""
+    """Add keywords (active) with a default bid and match type.
+
+    Any URL-tracking fields apply uniformly to every keyword in the batch.
+    """
+    url_fields = _present(
+        tracking_url_template=tracking_url_template,
+        final_url_suffix=final_url_suffix,
+        url_custom_parameters=_custom_parameters(url_custom_parameters),
+    )
     kw_models = [
-        Keyword(text=text, match_type=match_type, status="Active", bid=Bid(amount=default_bid))
+        Keyword(
+            text=text,
+            match_type=match_type,
+            status="Active",
+            bid=Bid(amount=default_bid),
+            **url_fields,
+        )
         for text in keywords
     ]
     resp = client.call(
@@ -220,6 +256,7 @@ def create_responsive_search_ad(
     path2: str = "",
     tracking_url_template: str | None = None,
     final_url_suffix: str | None = None,
+    url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
     """Create a paused Responsive Search Ad (RSA)."""
     ad = ResponsiveSearchAd(
@@ -229,7 +266,9 @@ def create_responsive_search_ad(
         headlines=[_asset_link(h[:30]) for h in headlines[:15]],
         descriptions=[_asset_link(d[:90]) for d in descriptions[:4]],
         **_present(
-            tracking_url_template=tracking_url_template, final_url_suffix=final_url_suffix
+            tracking_url_template=tracking_url_template,
+            final_url_suffix=final_url_suffix,
+            url_custom_parameters=_custom_parameters(url_custom_parameters),
         ),
     )
     if path1:
@@ -262,6 +301,7 @@ def update_campaign(
     bid_strategy_id: str | None = None,
     tracking_url_template: str | None = None,
     final_url_suffix: str | None = None,
+    url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
     """Update an existing campaign in place; only the fields you pass change."""
     _validate_status(status)
@@ -274,6 +314,7 @@ def update_campaign(
             bid_strategy_id=bid_strategy_id,
             tracking_url_template=tracking_url_template,
             final_url_suffix=final_url_suffix,
+            url_custom_parameters=_custom_parameters(url_custom_parameters),
         ),
     )
     resp = client.call(
@@ -300,6 +341,7 @@ def update_ad_group(
     cpc_bid: float | None = None,
     tracking_url_template: str | None = None,
     final_url_suffix: str | None = None,
+    url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
     """Update an existing ad group in place (Microsoft requires the parent ``campaign_id``)."""
     _validate_status(status)
@@ -308,6 +350,7 @@ def update_ad_group(
         status=status,
         tracking_url_template=tracking_url_template,
         final_url_suffix=final_url_suffix,
+        url_custom_parameters=_custom_parameters(url_custom_parameters),
     )
     if cpc_bid is not None:
         fields["cpc_bid"] = Bid(amount=cpc_bid)
@@ -339,6 +382,7 @@ def update_responsive_search_ad(
     status: str | None = None,
     tracking_url_template: str | None = None,
     final_url_suffix: str | None = None,
+    url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
     """Repoint/refresh an existing RSA in place; only the fields you pass change.
 
@@ -352,6 +396,7 @@ def update_responsive_search_ad(
         path2=path2[:15] if path2 is not None else None,
         tracking_url_template=tracking_url_template,
         final_url_suffix=final_url_suffix,
+        url_custom_parameters=_custom_parameters(url_custom_parameters),
     )
     if final_url is not None:
         fields["final_urls"] = [final_url]
@@ -360,9 +405,7 @@ def update_responsive_search_ad(
     if descriptions is not None:
         fields["descriptions"] = [_asset_link(d[:90]) for d in descriptions[:4]]
     ad = ResponsiveSearchAd(id=ad_id, type="ResponsiveSearch", **fields)
-    resp = client.call(
-        CAMPAIGN, "update_ads", UpdateAdsRequest(ad_group_id=ad_group_id, ads=[ad])
-    )
+    resp = client.call(CAMPAIGN, "update_ads", UpdateAdsRequest(ad_group_id=ad_group_id, ads=[ad]))
     errors = _partial_errors(resp)
     return MutationResult(
         ok=not errors,
@@ -381,10 +424,19 @@ def update_keyword(
     match_type: MatchType | None = None,
     status: str | None = None,
     final_url: str | None = None,
+    tracking_url_template: str | None = None,
+    final_url_suffix: str | None = None,
+    url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
-    """Update an existing keyword in place (bid, match type, status, or Final URL)."""
+    """Update an existing keyword in place (bid, match type, status, or URL fields)."""
     _validate_status(status)
-    fields: dict[str, Any] = _present(match_type=match_type, status=status)
+    fields: dict[str, Any] = _present(
+        match_type=match_type,
+        status=status,
+        tracking_url_template=tracking_url_template,
+        final_url_suffix=final_url_suffix,
+        url_custom_parameters=_custom_parameters(url_custom_parameters),
+    )
     if bid is not None:
         fields["bid"] = Bid(amount=bid)
     if final_url is not None:

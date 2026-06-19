@@ -10,6 +10,7 @@ from mcp.types import ToolAnnotations
 from ..api.client import get_client
 from ..domain.entities import (
     AccountSummary,
+    AccountUrlOptions,
     AdExtensionSummary,
     AdGroupSummary,
     AdSummary,
@@ -22,7 +23,17 @@ from ..domain.entities import (
     PostalCodeLocation,
     UetTagSummary,
 )
-from ..services import accounts, bulk, campaigns, conversions, criteria, extensions, geo, negatives
+from ..services import (
+    account_properties,
+    accounts,
+    bulk,
+    campaigns,
+    conversions,
+    criteria,
+    extensions,
+    geo,
+    negatives,
+)
 from ._common import guarded
 
 _READ = ToolAnnotations(readOnlyHint=True)
@@ -76,6 +87,18 @@ def register(mcp: FastMCP) -> None:
     def get_budgets() -> list[dict[str, Any]]:
         """Per-campaign budget view (daily budget and any shared-budget id)."""
         return guarded(lambda: campaigns.get_budgets(get_client()))
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_account_url_options() -> AccountUrlOptions:
+        """Read the account-level URL tracking that every campaign inherits.
+
+        This is where the tracking template / Final URL suffix usually live; per-campaign,
+        ad-group, ad, and keyword values are typically blank and inherit from here, so check
+        this (not just the hierarchy) to confirm how clicks are tracked.
+        `msclkid_auto_tagging_enabled` is what appends the Microsoft Click ID (msclkid) for
+        conversion attribution. Confirm these before activating paused campaigns.
+        """
+        return guarded(lambda: account_properties.get_account_url_options(get_client()))
 
     @mcp.tool(tags={"read"}, annotations=_READ)
     def get_negative_keywords(

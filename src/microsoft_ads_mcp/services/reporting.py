@@ -156,8 +156,7 @@ def _build_scope(
     if ad_group_id is not None:
         if "ad_groups" not in scope_cls.model_fields:
             raise ValueError(
-                "ad_group_id filtering needs report_type 'keyword', 'search_query', or "
-                "'geographic'"
+                "ad_group_id filtering needs report_type 'keyword', 'search_query', or 'geographic'"
             )
         scope_kwargs: dict[str, Any] = {"account_id": account, "ad_group_id": str(ad_group_id)}
         if campaign_id is not None:

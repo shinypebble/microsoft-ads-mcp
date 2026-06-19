@@ -104,9 +104,7 @@ def update_conversion_goal(client: MsAdsClient, *, goal_id: str, name: str) -> M
 
 def get_uet_tags(client: MsAdsClient, *, tag_ids: list[str] | None = None) -> list[UetTagSummary]:
     """List UET tags. Pass ``tag_ids`` to fetch specific tags (omit for all)."""
-    resp = client.call(
-        CAMPAIGN, "get_uet_tags_by_ids", GetUetTagsByIdsRequest(tag_ids=tag_ids)
-    )
+    resp = client.call(CAMPAIGN, "get_uet_tags_by_ids", GetUetTagsByIdsRequest(tag_ids=tag_ids))
     items = as_list(first_attr(resp, "UetTags", "uet_tags"))
     return [UetTagSummary.from_sdk(t) for t in items if t is not None]
 

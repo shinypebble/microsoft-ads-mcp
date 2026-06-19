@@ -73,6 +73,31 @@ class AccountSummary(BaseModel):
         )
 
 
+class AccountUrlOptions(BaseModel):
+    """Account-level URL tracking: the defaults every campaign inherits unless it overrides them.
+
+    These live on the account (CampaignManagementService ``AccountProperties``), not on the
+    per-campaign entity, so a blank ``tracking_url_template`` on a campaign/ad group/ad/keyword is
+    normal when it is set here. ``msclkid_auto_tagging_enabled`` is what appends the Microsoft
+    Click ID (``msclkid``) used for conversion attribution -- check it before activating campaigns.
+    """
+
+    tracking_url_template: str | None = None
+    final_url_suffix: str | None = None
+    msclkid_auto_tagging_enabled: bool | None = None
+    ad_click_parallel_tracking: bool | None = None
+
+    @classmethod
+    def from_properties(cls, props: dict[str, Any]) -> AccountUrlOptions:
+        """Build from a ``{property name: value}`` map of ``AccountProperty`` rows."""
+        return cls(
+            tracking_url_template=_blank_to_none(props.get("TrackingUrlTemplate")),
+            final_url_suffix=_blank_to_none(props.get("FinalUrlSuffix")),
+            msclkid_auto_tagging_enabled=_as_bool(props.get("MSCLKIDAutoTaggingEnabled")),
+            ad_click_parallel_tracking=_as_bool(props.get("AdClickParallelTracking")),
+        )
+
+
 class CampaignSummary(BaseModel):
     id: str
     name: str | None = None
@@ -80,6 +105,10 @@ class CampaignSummary(BaseModel):
     campaign_type: str | None = None
     daily_budget: float | None = None
     budget_id: str | None = None
+    # URL tracking (carries the click id + UTMs). null means "not set at this level".
+    tracking_url_template: str | None = None
+    final_url_suffix: str | None = None
+    url_custom_parameters: dict[str, str] | None = None
 
     @classmethod
     def from_sdk(cls, c: Any) -> CampaignSummary:
@@ -93,6 +122,9 @@ class CampaignSummary(BaseModel):
             campaign_type=str(ctype) if ctype is not None else None,
             daily_budget=_get(c, "DailyBudget", "daily_budget"),
             budget_id=_str_or_none(_get(c, "BudgetId", "budget_id")),
+            tracking_url_template=_get(c, "TrackingUrlTemplate", "tracking_url_template"),
+            final_url_suffix=_get(c, "FinalUrlSuffix", "final_url_suffix"),
+            url_custom_parameters=_custom_params(c),
         )
 
 
@@ -101,6 +133,10 @@ class AdGroupSummary(BaseModel):
     name: str | None = None
     status: str | None = None
     cpc_bid: float | None = None
+    # URL tracking. null means "not set here" (the campaign-level value, if any, applies).
+    tracking_url_template: str | None = None
+    final_url_suffix: str | None = None
+    url_custom_parameters: dict[str, str] | None = None
 
     @classmethod
     def from_sdk(cls, ag: Any) -> AdGroupSummary:
@@ -111,6 +147,9 @@ class AdGroupSummary(BaseModel):
             name=_get(ag, "Name", "name"),
             status=_str_or_none(_get(ag, "Status", "status")),
             cpc_bid=amount,
+            tracking_url_template=_get(ag, "TrackingUrlTemplate", "tracking_url_template"),
+            final_url_suffix=_get(ag, "FinalUrlSuffix", "final_url_suffix"),
+            url_custom_parameters=_custom_params(ag),
         )
 
 
@@ -120,6 +159,11 @@ class KeywordSummary(BaseModel):
     match_type: str | None = None
     status: str | None = None
     bid: float | None = None
+    # Keyword-level URL overrides (take precedence over ad-group/campaign values when set).
+    final_url: str | None = None
+    tracking_url_template: str | None = None
+    final_url_suffix: str | None = None
+    url_custom_parameters: dict[str, str] | None = None
 
     @classmethod
     def from_sdk(cls, kw: Any) -> KeywordSummary:
@@ -131,6 +175,10 @@ class KeywordSummary(BaseModel):
             match_type=_str_or_none(_get(kw, "MatchType", "match_type")),
             status=_str_or_none(_get(kw, "Status", "status")),
             bid=amount,
+            final_url=_first_final_url(kw),
+            tracking_url_template=_get(kw, "TrackingUrlTemplate", "tracking_url_template"),
+            final_url_suffix=_get(kw, "FinalUrlSuffix", "final_url_suffix"),
+            url_custom_parameters=_custom_params(kw),
         )
 
 
@@ -144,24 +192,25 @@ class AdSummary(BaseModel):
     descriptions: list[str] = []
     path1: str | None = None
     path2: str | None = None
+    # URL tracking on the ad itself.
+    tracking_url_template: str | None = None
+    final_url_suffix: str | None = None
+    url_custom_parameters: dict[str, str] | None = None
 
     @classmethod
     def from_sdk(cls, ad: Any) -> AdSummary:
-        urls = _get(ad, "FinalUrls", "final_urls")
-        final_url = None
-        if urls is not None:
-            items = _get(urls, "string", default=urls)
-            if isinstance(items, list) and items:
-                final_url = str(items[0])
         return cls(
             id=str(_get(ad, "Id", "id")),
             ad_type=_str_or_none(_get(ad, "Type", "type")),
             status=_str_or_none(_get(ad, "Status", "status")),
-            final_url=final_url,
+            final_url=_first_final_url(ad),
             headlines=_asset_texts(_get(ad, "Headlines", "headlines")),
             descriptions=_asset_texts(_get(ad, "Descriptions", "descriptions")),
             path1=_get(ad, "Path1", "path1"),
             path2=_get(ad, "Path2", "path2"),
+            tracking_url_template=_get(ad, "TrackingUrlTemplate", "tracking_url_template"),
+            final_url_suffix=_get(ad, "FinalUrlSuffix", "final_url_suffix"),
+            url_custom_parameters=_custom_params(ad),
         )
 
 
@@ -202,12 +251,6 @@ class AdExtensionSummary(BaseModel):
 
     @classmethod
     def from_sdk(cls, ext: Any) -> AdExtensionSummary:
-        urls = _get(ext, "FinalUrls", "final_urls")
-        final_url = None
-        if urls is not None:
-            items = _get(urls, "string", default=urls)
-            if isinstance(items, list) and items:
-                final_url = str(items[0])
         return cls(
             id=str(_get(ext, "Id", "id")),
             ad_extension_type=_str_or_none(_get(ext, "Type", "type")),
@@ -216,7 +259,7 @@ class AdExtensionSummary(BaseModel):
             country_code=_get(ext, "CountryCode", "country_code"),
             text=_get(ext, "Text", "text"),
             display_text=_get(ext, "DisplayText", "display_text"),
-            final_url=final_url,
+            final_url=_first_final_url(ext),
         )
 
 
@@ -324,6 +367,63 @@ def _str_or_none(val: Any) -> str | None:
     if val is None:
         return None
     return str(getattr(val, "value", val))
+
+
+def _blank_to_none(val: Any) -> str | None:
+    """Stringify, treating an empty string (Microsoft's "unset") as None."""
+    if val is None:
+        return None
+    return str(val) or None
+
+
+def _as_bool(val: Any) -> bool | None:
+    """Parse a Microsoft account-property boolean ("true"/"false" string) to a bool, else None."""
+    if val is None:
+        return None
+    s = str(val).strip().lower()
+    if s in ("true", "1"):
+        return True
+    if s in ("false", "0"):
+        return False
+    return None
+
+
+def _first_final_url(obj: Any) -> str | None:
+    """Return the first ``FinalUrls`` entry (the landing page), or None.
+
+    Tolerates the bare list the REST SDK returns or a ``{"string": [...]}`` wrapper.
+    """
+    urls = _get(obj, "FinalUrls", "final_urls")
+    if urls is None:
+        return None
+    items = _get(urls, "string", default=urls)
+    if isinstance(items, list) and items:
+        return str(items[0])
+    return None
+
+
+def _custom_params(obj: Any) -> dict[str, str] | None:
+    """Flatten ``UrlCustomParameters`` (a list of Key/Value pairs) into a plain dict.
+
+    These are the ``{_key}`` substitutions a tracking template / Final URL suffix can reference.
+    Returns None when none are set, so the field stays absent rather than an empty object.
+    """
+    cp = _get(obj, "UrlCustomParameters", "url_custom_parameters")
+    if cp is None:
+        return None
+    params = _get(cp, "Parameters", "parameters")
+    items = (
+        params
+        if isinstance(params, list)
+        else _get(params, "CustomParameter", "custom_parameter", default=[])
+    )
+    out: dict[str, str] = {}
+    for p in items if isinstance(items, list) else []:
+        key = _get(p, "Key", "key")
+        if key is not None:
+            val = _get(p, "Value", "value")
+            out[str(key)] = str(val) if val is not None else ""
+    return out or None
 
 
 def _asset_texts(links: Any) -> list[str]:
