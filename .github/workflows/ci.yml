@@ -7,7 +7,7 @@ on:
 
 jobs:
   ci:
-    runs-on: ubuntu-26.04-arm
+    runs-on: ubuntu-slim
     steps:
       - uses: actions/checkout@v7
 
