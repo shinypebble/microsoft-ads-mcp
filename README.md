@@ -1,5 +1,7 @@
 # microsoft-ads-mcp
 
+[![CI](https://github.com/shinypebble/microsoft-ads-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/shinypebble/microsoft-ads-mcp/actions/workflows/ci.yml)
+
 An MCP server for the **Microsoft Advertising (Bing Ads) REST API**, built for agent-led
 campaign management and reporting. It exposes a focused set of *useful-work* tools — walk the
 campaign tree, create **and edit in place** (rename, repoint Final URLs, tracking templates,
