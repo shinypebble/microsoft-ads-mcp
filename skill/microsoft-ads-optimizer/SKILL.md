@@ -19,6 +19,33 @@ A playbook for operating a single Microsoft Advertising (Bing Ads) account throu
    `set_active_account(account_id)` to switch which account subsequent calls hit, then
    re-confirm with `account_health` before writing.
 
+## Finding tools (search + execute discovery)
+
+The server runs in one of two modes; the rest of this playbook names tools by their real
+names, which work identically in both.
+
+- **Full catalog (default, `TOOL_SEARCH=false`)** — every tool is listed directly. Call them
+  by name as written below.
+- **Search + execute (`TOOL_SEARCH=true`)** — only a small set of **always-visible** core /
+  getting-started tools is listed up front: `account_health`, `search_accounts`,
+  `get_campaigns`, `run_performance_report`, and the auth tools (`get_auth_url`,
+  `complete_auth`). Everything else (the rest of the reads, and all writes) is discovered on
+  demand through two synthetic tools:
+  - `search_tools(query)` — BM25 search over tool names, descriptions, and parameters. Query
+    in plain language for the capability you need, e.g. `search_tools("add negative keywords")`
+    or `search_tools("set location intent presence")`.
+  - `call_tool(name, arguments)` — invoke a discovered tool by name, passing its arguments as
+    an object, e.g. `call_tool("update_campaign", {"campaign_id": "123", "status": "Active"})`.
+
+  Hidden tools keep their full typed schemas, so once `search_tools` surfaces one you get the
+  same parameters documented here. The flow is: start from a pinned tool (usually
+  `account_health` → `get_campaigns`), then `search_tools` to locate the specific lever and
+  `call_tool` to run it.
+
+The `READ_ONLY` gate is identical in both modes: when writes are disabled the write tools are
+not registered at all, so they are neither listed nor discoverable via `search_tools`. If a
+write tool doesn't turn up, confirm `account_health.read_only` before assuming it's missing.
+
 ## Reading the account
 
 - `get_campaigns` → `get_ad_groups(campaign_id)` → `get_keywords(ad_group_id)` /
@@ -32,6 +59,10 @@ A playbook for operating a single Microsoft Advertising (Bing Ads) account throu
   to scope to one entity (e.g. confirm a repointed URL is serving for one campaign).
 - `get_negative_keywords`, `get_ad_extensions`, `get_conversion_goals`, `get_uet_tags`, and
   `get_location_targets(campaign_id)` read the rest of the model.
+- `get_location_intent(campaign_id)` reads a campaign's location-intent setting — `PeopleIn`
+  (presence: only people physically in the targeted locations) vs.
+  `PeopleInOrSearchingForOrViewingPages` (Microsoft's default: also people searching
+  for/viewing pages about them). Check this when geo performance looks off-target.
 
 ## Building from scratch (only when read_only is false)
 
@@ -61,6 +92,10 @@ A playbook for operating a single Microsoft Advertising (Bing Ads) account throu
 - Conversion goals / UET: `update_conversion_goal(goal_id, name)`, `update_uet_tag(tag_id, ...)`.
 - ZIP/location targeting: `resolve_postal_codes(["98101", ...])` → `add_location_targets(
   campaign_id, location_ids, exclude=False)`; remove by criterion id from `get_location_targets`.
+- Location intent (presence vs. broader reach): `set_location_intent(campaign_id, "PeopleIn")`
+  to restrict to people physically in the targeted locations, or
+  `"PeopleInOrSearchingForOrViewingPages"` for Microsoft's default. There's one criterion per
+  campaign (auto-created), updated in place — read it first with `get_location_intent`.
 - Cleanup: `delete_campaign` / `delete_ad_group` / `delete_ad` / `delete_keyword`.
 - Atomic bulk apply/export: `bulk_upload(entity_records)` and `bulk_download()`.
 
