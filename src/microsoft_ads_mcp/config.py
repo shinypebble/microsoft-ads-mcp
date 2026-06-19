@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # Defaults to False: writes are enabled unless explicitly locked with READ_ONLY=true.
     read_only: bool = False
 
+    # --- Tool discovery ---
+    # When true, collapse the tool listing behind BM25 `search_tools` / `call_tool` (a few
+    # orientation tools stay pinned). Keeps every tool's typed schema + the READ_ONLY gate;
+    # the model discovers the rest on demand instead of paying for the full catalog upfront.
+    tool_search: bool = False
+
     # --- Transport (used by __main__) ---
     mcp_transport: str = "stdio"
     mcp_host: str = "127.0.0.1"

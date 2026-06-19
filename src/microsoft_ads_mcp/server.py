@@ -7,10 +7,29 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastmcp import FastMCP
+from fastmcp.server.transforms.search import BM25SearchTransform
 
 from .api.client import MsAdsClient, set_client
 from .config import Settings, get_settings
 from .tools import register_all
+
+# When TOOL_SEARCH is on, these orientation/onboarding tools stay directly listed; the rest are
+# discovered via `search_tools`. Keep this small — it's the "you are here" set, not a catalog.
+_PINNED_TOOLS = [
+    "account_health",
+    "search_accounts",
+    "get_campaigns",
+    "run_performance_report",
+    "get_auth_url",
+    "complete_auth",
+]
+
+_TOOL_SEARCH_NOTE = (
+    "\nThis server uses tool search: only a few orientation tools are listed directly. Discover "
+    "the rest with `search_tools(query)` (BM25 over names/descriptions/params) and invoke any "
+    "discovered tool with `call_tool(name, arguments)`. Hidden tools keep their full typed "
+    "schemas and the READ_ONLY gate."
+)
 
 _INSTRUCTIONS = (
     "Manage and report on a single Microsoft Advertising (Bing Ads) account.\n"
@@ -67,8 +86,15 @@ def create_server(settings: Settings | None = None) -> FastMCP:
         finally:
             set_client(None)
 
-    mcp: FastMCP = FastMCP(name="microsoft-ads", instructions=_INSTRUCTIONS, lifespan=lifespan)
+    instructions = _INSTRUCTIONS + (_TOOL_SEARCH_NOTE if settings.tool_search else "")
+    mcp: FastMCP = FastMCP(name="microsoft-ads", instructions=instructions, lifespan=lifespan)
     register_all(mcp, settings)
+
+    if settings.tool_search:
+        # Collapse the catalog behind BM25 search_tools / call_tool, keeping the pinned
+        # orientation tools listed. (All pins are read/auth tools, so they're always registered
+        # regardless of READ_ONLY; keep it that way — a write-tool pin would vanish in read-only.)
+        mcp.add_transform(BM25SearchTransform(always_visible=_PINNED_TOOLS))
 
     skills_root = _skills_root()
     if skills_root is not None:

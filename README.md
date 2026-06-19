@@ -69,6 +69,7 @@ Set via environment variables or a local `.env` (see [.env.example](.env.example
 | `MICROSOFT_ADS_ACCOUNT_ID` / `MICROSOFT_ADS_CUSTOMER_ID` | no | Discovered via `search_accounts` if unset |
 | `MICROSOFT_ADS_ENVIRONMENT` | no | `production` (default) or `sandbox` |
 | `READ_ONLY` | no | `true` registers no write tools at all (default `false`) |
+| `TOOL_SEARCH` | no | `true` collapses the catalog behind BM25 `search_tools` / `call_tool` with a few tools pinned; typed schemas and the `READ_ONLY` gate are preserved (default `false`) |
 
 Refresh tokens are persisted to `~/.config/microsoft-ads/tokens.json`, created with `0600`
 permissions (owner read/write only).
@@ -138,6 +139,17 @@ covering campaign / keyword / search-query / geographic reports. Supports a pred
 
 The `update_*` tools patch in place: only the fields you pass change. Prefer them over
 recreate-and-pause when an entity already exists.
+
+### Tool discovery (`TOOL_SEARCH`)
+
+With `TOOL_SEARCH=true`, the server lists only a few pinned orientation tools
+(`account_health`, `search_accounts`, `get_campaigns`, `run_performance_report`, plus the auth
+tools) alongside two synthetic tools: `search_tools(query)` (BM25 over names, descriptions, and
+parameters) and `call_tool(name, arguments)`. The rest of the catalog is discovered on demand
+instead of loaded upfront — useful as the tool count grows. Hidden tools keep their full typed
+schemas, and because search runs through the normal pipeline, the `READ_ONLY` gate still applies:
+write tools aren't registered in read-only mode, so they're neither listed nor discoverable. This
+is FastMCP's stable `BM25SearchTransform` — no code execution, no sandbox.
 
 ## Architecture
 
