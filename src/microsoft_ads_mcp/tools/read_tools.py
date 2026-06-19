@@ -18,6 +18,7 @@ from ..domain.entities import (
     ConversionGoalSummary,
     KeywordSummary,
     LocationCriterionSummary,
+    LocationIntentSummary,
     NegativeEntityType,
     NegativeKeywordSummary,
     PostalCodeLocation,
@@ -191,6 +192,20 @@ def register(mcp: FastMCP) -> None:
             campaign_id: The campaign id.
         """
         return guarded(lambda: criteria.get_location_targets(get_client(), campaign_id=campaign_id))
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_location_intent(campaign_id: str) -> LocationIntentSummary | None:
+        """Read a campaign's location-intent setting (presence vs. broader reach).
+
+        Returns the single LocationIntent criterion's `intent_option`: `PeopleIn` (only people
+        physically in the targeted locations) or `PeopleInOrSearchingForOrViewingPages` (people
+        in, searching for, or viewing pages about them; Microsoft's default). Legacy campaigns
+        may still report the deprecated `PeopleSearchingForOrViewingPages`.
+
+        Args:
+            campaign_id: The campaign id.
+        """
+        return guarded(lambda: criteria.get_location_intent(get_client(), campaign_id=campaign_id))
 
     @mcp.tool(tags={"read"}, annotations=_READ)
     def resolve_postal_codes(

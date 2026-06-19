@@ -80,6 +80,78 @@ def test_remove_location_targets_passes_criterion_type() -> None:
     assert request.campaign_criterion_ids == ["900"]
 
 
+class _SequencedClient:
+    """Returns queued responses in order (for flows that make several calls)."""
+
+    account_id = "123"
+
+    def __init__(self, *responses: Any) -> None:
+        self._responses = list(responses)
+        self.calls: list[tuple[str, str, Any]] = []
+
+    def call(self, service: str, method: str, request: Any) -> Any:
+        self.calls.append((service, method, request))
+        return self._responses.pop(0)
+
+
+def _intent_criterion(intent: str) -> Any:
+    crit = SimpleNamespace(type="LocationIntentCriterion", intent_option=intent)
+    return SimpleNamespace(id="487928625", campaign_id="487928625", criterion=crit)
+
+
+def test_get_location_intent_reads_current_option() -> None:
+    resp = SimpleNamespace(campaign_criterions=[_intent_criterion("PeopleIn")])
+    client = _FakeClient(resp)
+    summary = criteria.get_location_intent(client, campaign_id="487928625")
+    assert summary is not None
+    assert summary.intent_option == "PeopleIn"
+    assert summary.criterion_id == "487928625"
+    request = client.calls[0][2]
+    assert request.criterion_type.name == "LOCATIONINTENT"
+
+
+def test_get_location_intent_returns_none_when_absent() -> None:
+    client = _FakeClient(SimpleNamespace(campaign_criterions=[]))
+    assert criteria.get_location_intent(client, campaign_id="1") is None
+
+
+def test_set_location_intent_updates_existing_criterion() -> None:
+    get_resp = SimpleNamespace(campaign_criterions=[_intent_criterion("PeopleIn")])
+    update_resp = SimpleNamespace(nested_partial_errors=[])
+    client = _SequencedClient(get_resp, update_resp)
+    result = criteria.set_location_intent(
+        client, campaign_id="487928625", intent_option="PeopleInOrSearchingForOrViewingPages"
+    )
+    assert result.ok and result.ids == ["487928625"]
+    # First call reads (LocationIntent type), second call updates.
+    get_request = client.calls[0][2]
+    assert client.calls[0][1] == "get_campaign_criterions_by_ids"
+    assert get_request.criterion_type.name == "LOCATIONINTENT"
+    _, method, request = client.calls[1]
+    assert method == "update_campaign_criterions"
+    # Updates of target criterions (incl. location intent) must use the umbrella Targets type;
+    # the specific LocationIntent type is only valid for the get filter (the API 400s otherwise).
+    assert request.criterion_type.name == "TARGETS"
+    cc = request.campaign_criterions[0]
+    assert cc.type == "BiddableCampaignCriterion" and cc.id == "487928625"
+    assert cc.criterion.type == "LocationIntentCriterion"
+    assert cc.criterion.intent_option.value == "PeopleInOrSearchingForOrViewingPages"
+
+
+def test_set_location_intent_adds_when_no_criterion_exists() -> None:
+    # A campaign with no criterions yet has no location-intent criterion to update, so add one.
+    get_resp = SimpleNamespace(campaign_criterions=[])
+    add_resp = SimpleNamespace(campaign_criterion_ids=["555"], nested_partial_errors=[])
+    client = _SequencedClient(get_resp, add_resp)
+    result = criteria.set_location_intent(client, campaign_id="1", intent_option="PeopleIn")
+    assert result.ok and result.ids == ["555"]
+    _, method, request = client.calls[1]
+    assert method == "add_campaign_criterions"
+    assert request.criterion_type.name == "TARGETS"
+    cc = request.campaign_criterions[0]
+    assert cc.id is None and cc.criterion.intent_option.value == "PeopleIn"
+
+
 def test_bulk_download_entities_mapping() -> None:
     members = bulk._download_entities(["Campaigns", "Keywords"])
     assert [m.name for m in members] == ["CAMPAIGNS", "KEYWORDS"]

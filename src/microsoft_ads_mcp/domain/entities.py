@@ -17,6 +17,17 @@ MatchType = Literal["Broad", "Phrase", "Exact"]
 CampaignStatus = Literal["Active", "Paused"]
 # Negative keywords attach to either a campaign or an ad group (no reusable list object here).
 NegativeEntityType = Literal["Campaign", "AdGroup"]
+# Location intent: who sees the ad relative to the campaign's targeted locations. Microsoft's
+# enum spelling is used verbatim so the value maps straight onto the API. The third historical
+# value, "PeopleSearchingForOrViewingPages", was deprecated in April 2024 (Microsoft silently
+# coerces it to the default), so it is not offered here -- reads may still return it for legacy
+# campaigns since `get_location_intent` returns a plain str, not this Literal.
+IntentOption = Literal[
+    # People physically in (or regularly in) the targeted locations ("presence").
+    "PeopleIn",
+    # People in, searching for, or viewing pages about the targeted locations (Microsoft default).
+    "PeopleInOrSearchingForOrViewingPages",
+]
 # Discriminated auth result so a client can branch deterministically instead of string-matching.
 AuthState = Literal[
     "ok",
@@ -325,6 +336,25 @@ class LocationCriterionSummary(BaseModel):
             # Location bid adjustments are BidMultiplier (Multiplier); other bids use Amount.
             bid_adjustment=(
                 _get(bid, "Multiplier", "multiplier", "Amount", "amount") if bid else None
+            ),
+        )
+
+
+class LocationIntentSummary(BaseModel):
+    """The single location-intent criterion on a campaign (presence vs. search interest)."""
+
+    criterion_id: str | None = None  # the campaign criterion id (equals the campaign id)
+    campaign_id: str | None = None
+    intent_option: str | None = None
+
+    @classmethod
+    def from_sdk(cls, c: Any) -> LocationIntentSummary:
+        crit = _get(c, "Criterion", "criterion")
+        return cls(
+            criterion_id=_str_or_none(_get(c, "Id", "id")),
+            campaign_id=_str_or_none(_get(c, "CampaignId", "campaign_id")),
+            intent_option=(
+                _str_or_none(_get(crit, "IntentOption", "intent_option")) if crit else None
             ),
         )
 

@@ -8,7 +8,13 @@ from fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from ..api.client import get_client
-from ..domain.entities import CampaignStatus, MatchType, MutationResult, NegativeEntityType
+from ..domain.entities import (
+    CampaignStatus,
+    IntentOption,
+    MatchType,
+    MutationResult,
+    NegativeEntityType,
+)
 from ..services import (
     account_properties,
     bulk,
@@ -646,6 +652,27 @@ def register(mcp: FastMCP) -> None:
                 location_ids=location_ids,
                 bid_adjustment=bid_adjustment,
                 exclude=exclude,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def set_location_intent(campaign_id: str, intent_option: IntentOption) -> MutationResult:
+        """Set who sees a campaign's ads relative to its targeted locations (location intent).
+
+        Updates the campaign's single LocationIntent criterion in place (created by Microsoft
+        with a default of "PeopleInOrSearchingForOrViewingPages"). Read the current value first
+        with get_location_intent.
+
+        Args:
+            campaign_id: The campaign id.
+            intent_option: "PeopleIn" (presence — only people physically in/regularly in the
+                targeted locations) or "PeopleInOrSearchingForOrViewingPages" (people in,
+                searching for, or viewing pages about them; Microsoft's default). The legacy
+                "search-interest-only" option was deprecated by Microsoft in April 2024.
+        """
+        return guarded(
+            lambda: criteria.set_location_intent(
+                get_client(), campaign_id=campaign_id, intent_option=intent_option
             )
         )
 

@@ -116,7 +116,8 @@ deterministically instead of pattern-matching an error string.
 **Read** — `account_health`, `search_accounts`, `set_active_account` (switch which account
 calls hit), `get_campaigns`, `get_ad_groups`, `get_keywords`, `get_ads` (includes the RSA copy:
 headlines / descriptions / paths), `get_budgets`, `get_negative_keywords`, `get_ad_extensions`,
-`get_conversion_goals`, `get_uet_tags`, `get_location_targets`, `resolve_postal_codes`
+`get_conversion_goals`, `get_uet_tags`, `get_location_targets`, `get_location_intent`
+(presence vs. search-interest targeting), `resolve_postal_codes`
 (ZIP → Microsoft LocationId), `bulk_download`, `get_account_url_options`. The hierarchy reads
 (`get_campaigns`, `get_ad_groups`, `get_ads`, `get_keywords`) also surface each entity's URL
 tracking — `tracking_url_template`, `final_url_suffix`, and `url_custom_parameters`. A `null`
@@ -146,7 +147,9 @@ covering campaign / keyword / search-query / geographic reports. Supports a pred
 - *Ad extensions* — `add_call_extension`, `update_call_extension`, `add_callout_extension`,
   `add_sitelink_extension`, `delete_ad_extension`.
 - *Conversion goals / UET tags* — `update_conversion_goal`, `update_uet_tag`.
-- *Location (ZIP/geo) targeting* — `add_location_targets`, `remove_location_targets`.
+- *Location (ZIP/geo) targeting* — `add_location_targets`, `remove_location_targets`,
+  `set_location_intent` (presence — `PeopleIn` — vs. search-interest targeting; one criterion
+  per campaign, updated in place).
 - *Bulk API* — `bulk_upload`.
 
 The `update_*` tools patch in place: only the fields you pass change. Prefer them over
