@@ -53,8 +53,11 @@ A playbook for operating a single Microsoft Advertising (Bing Ads) account throu
   editing every URL.
 - Negatives: `add_negative_keywords(entity_id, keywords, entity_type)` (Campaign or AdGroup),
   `remove_negative_keywords` (by id — resolve with `get_negative_keywords` first).
-- Extensions: `update_call_extension(ad_extension_id, phone_number=..., country_code="US")`;
-  `add_callout_extension` / `add_sitelink_extension` create-and-associate to a campaign/ad group.
+- Extensions: `add_call_extension` / `add_callout_extension` / `add_sitelink_extension`
+  create-and-associate to a campaign/ad group; `update_call_extension(ad_extension_id,
+  phone_number=..., country_code="US")` edits one in place; `delete_ad_extension(ids)` removes
+  extension objects. Note `get_ad_extensions` only lists extensions *associated* at the queried
+  scope, so a freshly created, unattached extension won't appear there.
 - Conversion goals / UET: `update_conversion_goal(goal_id, name)`, `update_uet_tag(tag_id, ...)`.
 - ZIP/location targeting: `resolve_postal_codes(["98101", ...])` → `add_location_targets(
   campaign_id, location_ids, exclude=False)`; remove by criterion id from `get_location_targets`.

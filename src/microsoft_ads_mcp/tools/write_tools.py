@@ -469,6 +469,47 @@ def register(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def add_call_extension(
+        phone_number: str,
+        country_code: str = "US",
+        is_call_only: bool = False,
+        entity_id: str | None = None,
+        association_type: str = "Campaign",
+    ) -> MutationResult:
+        """Create a call extension and optionally attach it to a campaign or ad group.
+
+        Args:
+            phone_number: The phone number to show (e.g. "2065550100").
+            country_code: Two-letter country code for the number (default "US").
+            is_call_only: Whether the extension shows only the phone number (no website click).
+            entity_id: Campaign or ad group id to associate it with (omit to create unattached).
+            association_type: "Campaign" or "AdGroup" (default "Campaign").
+        """
+        return guarded(
+            lambda: extensions.add_call_extension(
+                get_client(),
+                phone_number=phone_number,
+                country_code=country_code,
+                is_call_only=is_call_only,
+                entity_id=entity_id,
+                association_type=association_type,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def delete_ad_extension(ad_extension_ids: list[str]) -> MutationResult:
+        """Delete account-level ad extensions by id.
+
+        Removes the extension objects entirely (not just their campaign/ad-group associations).
+
+        Args:
+            ad_extension_ids: The ad extension ids to delete (from get_ad_extensions).
+        """
+        return guarded(
+            lambda: extensions.delete_ad_extensions(get_client(), ad_extension_ids=ad_extension_ids)
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
     def update_conversion_goal(goal_id: str, name: str) -> MutationResult:
         """Rename a conversion goal in place.
 

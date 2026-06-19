@@ -130,7 +130,8 @@ covering campaign / keyword / search-query / geographic reports. Supports a pred
   and `final_url_suffix`.
 - *Negative keywords* — `add_negative_keywords`, `remove_negative_keywords` (campaign or ad-group
   scope).
-- *Ad extensions* — `update_call_extension`, `add_callout_extension`, `add_sitelink_extension`.
+- *Ad extensions* — `add_call_extension`, `update_call_extension`, `add_callout_extension`,
+  `add_sitelink_extension`, `delete_ad_extension`.
 - *Conversion goals / UET tags* — `update_conversion_goal`, `update_uet_tag`.
 - *Location (ZIP/geo) targeting* — `add_location_targets`, `remove_location_targets`.
 - *Bulk API* — `bulk_upload`.

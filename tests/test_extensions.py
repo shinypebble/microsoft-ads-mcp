@@ -78,6 +78,34 @@ def test_update_call_extension_is_partial_with_discriminator() -> None:
     assert ext.phone_number == "8005550000" and ext.country_code == "US"
 
 
+def test_add_call_extension_sets_discriminator_and_associates() -> None:
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(
+                ad_extension_identities=[SimpleNamespace(id="42")], nested_partial_errors=[]
+            ),
+            SimpleNamespace(nested_partial_errors=[]),
+        ]
+    )
+    result = extensions.add_call_extension(
+        client, phone_number="2065550100", country_code="US", entity_id="487928625"
+    )
+    assert result.ok and result.ids == ["42"]
+    assert [c[1] for c in client.calls] == ["add_ad_extensions", "set_ad_extensions_associations"]
+    ext = client.calls[0][2].ad_extensions[0]
+    assert ext.type == "CallAdExtension" and ext.phone_number == "2065550100"
+
+
+def test_delete_ad_extensions_reports_count() -> None:
+    client = _ScriptedClient([SimpleNamespace(partial_errors=[])])
+    result = extensions.delete_ad_extensions(client, ad_extension_ids=["8246425030221"])
+    assert result.ok and result.ids == ["8246425030221"]
+    assert "1 ad extension" in result.message
+    _, method, request = client.calls[0]
+    assert method == "delete_ad_extensions"
+    assert request.ad_extension_ids == ["8246425030221"]
+
+
 def test_add_callout_creates_then_associates() -> None:
     client = _ScriptedClient(
         [

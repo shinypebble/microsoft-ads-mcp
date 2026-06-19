@@ -17,6 +17,7 @@ from openapi_client.models.campaign.ad_extensions_type_filter import AdExtension
 from openapi_client.models.campaign.add_ad_extensions_request import AddAdExtensionsRequest
 from openapi_client.models.campaign.call_ad_extension import CallAdExtension
 from openapi_client.models.campaign.callout_ad_extension import CalloutAdExtension
+from openapi_client.models.campaign.delete_ad_extensions_request import DeleteAdExtensionsRequest
 from openapi_client.models.campaign.get_ad_extension_ids_by_account_id_request import (
     GetAdExtensionIdsByAccountIdRequest,
 )
@@ -31,7 +32,7 @@ from openapi_client.models.campaign.update_ad_extensions_request import UpdateAd
 
 from ..api.client import CAMPAIGN, MsAdsClient
 from ..domain.entities import AdExtensionSummary, MutationResult
-from . import as_list, first_attr, nested_partial_errors
+from . import as_list, first_attr, flat_partial_errors, nested_partial_errors
 
 # Association scopes: which entity an extension is attached to.
 _ASSOCIATION_TYPES = ("Account", "Campaign", "AdGroup")
@@ -219,3 +220,43 @@ def add_sitelink_extension(
         type="SitelinkAdExtension", display_text=display_text[:25], final_urls=[final_url]
     )
     return _add_and_associate(client, ext, entity_id, association_type, "Sitelink extension")
+
+
+def add_call_extension(
+    client: MsAdsClient,
+    *,
+    phone_number: str,
+    country_code: str = "US",
+    is_call_only: bool = False,
+    entity_id: str | None = None,
+    association_type: str = "Campaign",
+) -> MutationResult:
+    """Create a call extension and optionally associate it to a campaign or ad group."""
+    ext = CallAdExtension(
+        type="CallAdExtension",
+        phone_number=phone_number,
+        country_code=country_code,
+        is_call_only=is_call_only,
+    )
+    return _add_and_associate(client, ext, entity_id, association_type, "Call extension")
+
+
+def delete_ad_extensions(client: MsAdsClient, *, ad_extension_ids: list[str]) -> MutationResult:
+    """Delete account-level ad extensions by id (removes the objects, not just associations)."""
+    resp = client.call(
+        CAMPAIGN,
+        "delete_ad_extensions",
+        DeleteAdExtensionsRequest(account_id=client.account_id, ad_extension_ids=ad_extension_ids),
+    )
+    errors = flat_partial_errors(resp)
+    n = len(ad_extension_ids)
+    return MutationResult(
+        ok=not errors,
+        message=(
+            f"Deleted {n} ad extension{'s' if n != 1 else ''}"
+            if not errors
+            else "Delete ad extensions failed"
+        ),
+        ids=[str(i) for i in ad_extension_ids],
+        partial_errors=errors,
+    )

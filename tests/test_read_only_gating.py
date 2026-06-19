@@ -26,6 +26,8 @@ WRITE_TOOLS = {
     "update_call_extension",
     "add_callout_extension",
     "add_sitelink_extension",
+    "add_call_extension",
+    "delete_ad_extension",
     "update_conversion_goal",
     "update_uet_tag",
     "add_location_targets",
