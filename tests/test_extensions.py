@@ -78,6 +78,75 @@ def test_update_call_extension_is_partial_with_discriminator() -> None:
     assert ext.phone_number == "8005550000" and ext.country_code == "US"
 
 
+def test_update_call_extension_enables_call_tracking_merges_required_fields() -> None:
+    # A tracking-only toggle must re-send phone/country (Microsoft replaces the whole object),
+    # so the service first GETs the existing extension, then updates with the merged fields.
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(
+                ad_extensions=[
+                    SimpleNamespace(
+                        id="8246425032469",
+                        type="CallAdExtension",
+                        phone_number="8555665900",
+                        country_code="US",
+                    )
+                ]
+            ),
+            SimpleNamespace(nested_partial_errors=[]),
+        ]
+    )
+    result = extensions.update_call_extension(
+        client, ad_extension_id="8246425032469", is_call_tracking_enabled=True
+    )
+    assert result.ok
+    assert [c[1] for c in client.calls] == ["get_ad_extensions_by_ids", "update_ad_extensions"]
+    ext = client.calls[1][2].ad_extensions[0]
+    assert ext.id == "8246425032469" and ext.is_call_tracking_enabled is True
+    # Phone/country are merged from the fetched extension rather than nulled.
+    assert ext.phone_number == "8555665900" and ext.country_code == "US"
+
+
+def test_update_call_extension_skips_fetch_when_required_fields_supplied() -> None:
+    # Both required fields given -> no fetch, single update call.
+    client = _ScriptedClient([SimpleNamespace(nested_partial_errors=[])])
+    result = extensions.update_call_extension(
+        client,
+        ad_extension_id="55",
+        phone_number="8005550000",
+        country_code="US",
+        is_call_tracking_enabled=True,
+    )
+    assert result.ok
+    assert [c[1] for c in client.calls] == ["update_ad_extensions"]
+
+
+def test_update_call_extension_reports_missing_extension() -> None:
+    client = _ScriptedClient([SimpleNamespace(ad_extensions=[])])
+    result = extensions.update_call_extension(
+        client, ad_extension_id="999", is_call_tracking_enabled=True
+    )
+    assert not result.ok and "not found" in result.message
+    # Never attempts the update when the extension can't be read for the merge.
+    assert [c[1] for c in client.calls] == ["get_ad_extensions_by_ids"]
+
+
+def test_add_call_extension_carries_call_tracking_flag() -> None:
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(
+                ad_extension_identities=[SimpleNamespace(id="42")], nested_partial_errors=[]
+            )
+        ]
+    )
+    result = extensions.add_call_extension(
+        client, phone_number="8555665900", country_code="US", is_call_tracking_enabled=True
+    )
+    assert result.ok and result.ids == ["42"]
+    ext = client.calls[0][2].ad_extensions[0]
+    assert ext.type == "CallAdExtension" and ext.is_call_tracking_enabled is True
+
+
 def test_add_call_extension_sets_discriminator_and_associates() -> None:
     client = _ScriptedClient(
         [

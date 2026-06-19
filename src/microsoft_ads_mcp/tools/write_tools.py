@@ -490,14 +490,23 @@ def register(mcp: FastMCP) -> None:
         phone_number: str | None = None,
         country_code: str | None = None,
         is_call_only: bool | None = None,
+        is_call_tracking_enabled: bool | None = None,
     ) -> MutationResult:
-        """Update an existing call extension in place (e.g. the brand's phone number).
+        """Update an existing call extension in place (e.g. the brand's phone number or tracking).
+
+        Microsoft replaces the whole call extension on update, so phone number and country code
+        are always required; when you omit them (e.g. to flip only is_call_tracking_enabled) this
+        tool fetches the current extension and re-sends them, so a single-field toggle is safe.
 
         Args:
             ad_extension_id: The call extension id (from get_ad_extensions).
-            phone_number: New phone number.
-            country_code: Two-letter country code for the number (e.g. "US").
+            phone_number: New phone number (omit to keep the current one).
+            country_code: Two-letter country code for the number, e.g. "US" (omit to keep current).
             is_call_only: Whether the extension shows only the phone number (no website click).
+            is_call_tracking_enabled: Turn Microsoft call tracking on/off (US/UK only). When on,
+                Microsoft displays a forwarding number so call conversions are measured (new
+                forwarding numbers are local, not toll-free). Pass true to enable tracking on an
+                existing plain call asset.
         """
         return guarded(
             lambda: extensions.update_call_extension(
@@ -506,6 +515,7 @@ def register(mcp: FastMCP) -> None:
                 phone_number=phone_number,
                 country_code=country_code,
                 is_call_only=is_call_only,
+                is_call_tracking_enabled=is_call_tracking_enabled,
             )
         )
 
@@ -561,6 +571,7 @@ def register(mcp: FastMCP) -> None:
         phone_number: str,
         country_code: str = "US",
         is_call_only: bool = False,
+        is_call_tracking_enabled: bool = False,
         entity_id: str | None = None,
         association_type: str = "Campaign",
     ) -> MutationResult:
@@ -570,6 +581,9 @@ def register(mcp: FastMCP) -> None:
             phone_number: The phone number to show (e.g. "2065550100").
             country_code: Two-letter country code for the number (default "US").
             is_call_only: Whether the extension shows only the phone number (no website click).
+            is_call_tracking_enabled: Turn on Microsoft call tracking (US/UK only) so call-from-ad
+                conversions are measured. Microsoft displays a forwarding number instead of the
+                raw number; new forwarding numbers are local (toll-free is no longer provisioned).
             entity_id: Campaign or ad group id to associate it with (omit to create unattached).
             association_type: "Campaign" or "AdGroup" (default "Campaign").
         """
@@ -579,6 +593,7 @@ def register(mcp: FastMCP) -> None:
                 phone_number=phone_number,
                 country_code=country_code,
                 is_call_only=is_call_only,
+                is_call_tracking_enabled=is_call_tracking_enabled,
                 entity_id=entity_id,
                 association_type=association_type,
             )

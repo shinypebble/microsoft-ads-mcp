@@ -124,6 +124,21 @@ def get_ad_extensions(
     return [AdExtensionSummary.from_sdk(e) for e in items if e is not None]
 
 
+def _get_call_extension(client: MsAdsClient, ad_extension_id: str) -> Any:
+    """Fetch a single call extension by id (or None) so an update can merge required fields."""
+    resp = client.call(
+        CAMPAIGN,
+        "get_ad_extensions_by_ids",
+        GetAdExtensionsByIdsRequest(
+            account_id=client.account_id,
+            ad_extension_ids=[ad_extension_id],
+            ad_extension_type=_type_filter(["Call"]),
+        ),
+    )
+    items = as_list(first_attr(resp, "AdExtensions", "ad_extensions"))
+    return next((e for e in items if e is not None), None)
+
+
 def update_call_extension(
     client: MsAdsClient,
     *,
@@ -131,8 +146,30 @@ def update_call_extension(
     phone_number: str | None = None,
     country_code: str | None = None,
     is_call_only: bool | None = None,
+    is_call_tracking_enabled: bool | None = None,
 ) -> MutationResult:
-    """Update an existing call extension in place (e.g. the brand's phone number)."""
+    """Update an existing call extension in place (e.g. the brand's phone number or call tracking).
+
+    Microsoft's update *replaces* the whole CallAdExtension, so it requires the phone number and
+    country code on every update -- omitting them would null them (and the API rejects that).
+    To honor the "only the fields you pass change" contract for single-field toggles (e.g. just
+    flipping ``is_call_tracking_enabled``), we fetch the current extension and re-send the existing
+    ``phone_number`` / ``country_code`` whenever the caller leaves them out.
+    """
+    if phone_number is None or country_code is None:
+        existing = _get_call_extension(client, ad_extension_id)
+        if existing is None:
+            return MutationResult(
+                ok=False,
+                message=f"Call extension {ad_extension_id} not found",
+                ids=[],
+                partial_errors=[f"Call extension {ad_extension_id} not found"],
+            )
+        if phone_number is None:
+            phone_number = first_attr(existing, "PhoneNumber", "phone_number")
+        if country_code is None:
+            country_code = first_attr(existing, "CountryCode", "country_code")
+
     fields: dict[str, Any] = {}
     if phone_number is not None:
         fields["phone_number"] = phone_number
@@ -140,6 +177,8 @@ def update_call_extension(
         fields["country_code"] = country_code
     if is_call_only is not None:
         fields["is_call_only"] = is_call_only
+    if is_call_tracking_enabled is not None:
+        fields["is_call_tracking_enabled"] = is_call_tracking_enabled
     ext = CallAdExtension(id=ad_extension_id, type="CallAdExtension", **fields)
     resp = client.call(
         CAMPAIGN,
@@ -228,15 +267,23 @@ def add_call_extension(
     phone_number: str,
     country_code: str = "US",
     is_call_only: bool = False,
+    is_call_tracking_enabled: bool = False,
     entity_id: str | None = None,
     association_type: str = "Campaign",
 ) -> MutationResult:
-    """Create a call extension and optionally associate it to a campaign or ad group."""
+    """Create a call extension and optionally associate it to a campaign or ad group.
+
+    ``is_call_tracking_enabled`` turns on Microsoft call tracking (US/UK only): Microsoft swaps
+    the displayed number for a forwarding number so call conversions can be measured. Note new
+    toll-free forwarding numbers are no longer provisioned (since Aug 2017), so tracking yields a
+    *local* forwarding number.
+    """
     ext = CallAdExtension(
         type="CallAdExtension",
         phone_number=phone_number,
         country_code=country_code,
         is_call_only=is_call_only,
+        is_call_tracking_enabled=is_call_tracking_enabled,
     )
     return _add_and_associate(client, ext, entity_id, association_type, "Call extension")
 
