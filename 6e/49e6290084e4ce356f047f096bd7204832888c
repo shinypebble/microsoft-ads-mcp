@@ -1,0 +1,41 @@
+src/microsoft_ads_mcp/services/conversions.py
+  s_fc176c5ca78215::t_6174dc5fbf002e 83
+  s_fc176c5ca78215::t_072dec9b8a88bd 17-19,31-40,46-72
+src/microsoft_ads_mcp/services/geo.py
+  s_fc176c5ca78215::t_3da54a0be08b89 68-72,90-93,111-118
+tests/test_geo_criteria_bulk.py
+  s_fc176c5ca78215::t_028089c32a66dc 13-14,16-20,23,25-30
+  s_fc176c5ca78215::t_da88a069058dd0 59,63
+  s_fc176c5ca78215::t_0ef0f46cf6e914 79
+src/microsoft_ads_mcp/domain/entities.py
+  s_fc176c5ca78215::t_7a8a5c65e116df 282
+  s_fc176c5ca78215::t_54349d1b521de3 283-285
+src/microsoft_ads_mcp/services/extensions.py
+  s_fc176c5ca78215::t_9e56cb9da3cf07 86
+  s_fc176c5ca78215::t_4f89335a907fe4 39-52,54-61,68,71
+src/microsoft_ads_mcp/services/criteria.py
+  s_fc176c5ca78215::t_a8e1ae6f5c3fbd 122,126
+  s_fc176c5ca78215::t_71c2f5ce211d0f 15
+  s_fc176c5ca78215::t_c9a6562385fbbc 72-78,84,90-91,93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "6e49e6290084e4ce356f047f096bd7204832888c",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_fc176c5ca78215": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f51c3f7c-4595-452e-82ad-ebe9277ea108",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": null
+    }
+  }
+}
