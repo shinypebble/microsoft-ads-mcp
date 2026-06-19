@@ -1,0 +1,50 @@
+tests/test_geo_criteria_bulk.py
+  s_f40a7d29533141::t_ac790d25ad74fd 126-127,129,132-134,141-145,147-152
+  s_f40a7d29533141::t_18b3259fc7a428 83-125,128,130-131,135-140,146,153-154
+src/microsoft_ads_mcp/server.py
+  s_f40a7d29533141::t_dc0b27755164d4 60-62
+src/microsoft_ads_mcp/tools/read_tools.py
+  s_f40a7d29533141::t_c6afbaf6dfd5b1 21
+  s_f40a7d29533141::t_5b0aa4928b472d 197,199-200,204-209
+  s_f40a7d29533141::t_b78d59fb9786c3 198,201-203
+src/microsoft_ads_mcp/services/criteria.py
+  s_f40a7d29533141::t_248b9e6d2c719b 207
+  s_f40a7d29533141::t_39cde6da26ba6c 26,28,30-32,35-39
+  s_f40a7d29533141::t_914c3c06cff3be 126-137,139-144,146-155,160-163,199-201,205-206,213,215-216,218-219,221-224
+  s_f40a7d29533141::t_bb7ee3e8ff0c20 138
+  s_f40a7d29533141::t_13a4e73fc658e3 145
+  s_f40a7d29533141::t_b8e20bc75a616d 156-159,164-198,202-204,208-212,214,217,220
+  s_f40a7d29533141::t_02a999d2b070e5 12-13
+src/microsoft_ads_mcp/domain/entities.py
+  s_f40a7d29533141::t_ed758fedb7f9b3 343-361
+  s_f40a7d29533141::t_9a684d276e3710 20,25-27,29-30
+  s_f40a7d29533141::t_c63ef17ed6376a 21-24,28
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_f40a7d29533141::t_bda570850c0bf1 659-668,672-679
+  s_f40a7d29533141::t_cf30e5f687aabe 669-671
+  s_f40a7d29533141::t_e4c010c8eda2a4 11-17
+README.md
+  s_f40a7d29533141::t_2eacaec2836f57 150-152
+  s_f40a7d29533141::t_58429c00bd4cb4 119-120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "a6034277fdb635e5e8b217a83e9a307dc2d0ac5c",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_f40a7d29533141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad2bbbe9-b0a2-459e-b70e-a5c4ae05153f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
