@@ -204,6 +204,11 @@ class KeywordSummary(BaseModel):
     text: str | None = None
     match_type: str | None = None
     status: str | None = None
+    # Editorial (ad-review) status, distinct from `status` (Active/Paused): a keyword can be
+    # Active but Disapproved (rejected, won't serve) or Inactive (pending review). Values:
+    # Active (approved), Inactive (under review), ActiveLimited (approved in some markets only),
+    # Disapproved (rejected). Check this first when an Active keyword gets zero impressions.
+    editorial_status: str | None = None
     bid: float | None = None
     # Keyword-level URL overrides (take precedence over ad-group/campaign values when set).
     final_url: str | None = None
@@ -220,6 +225,7 @@ class KeywordSummary(BaseModel):
             text=_get(kw, "Text", "text"),
             match_type=_str_or_none(_get(kw, "MatchType", "match_type")),
             status=_str_or_none(_get(kw, "Status", "status")),
+            editorial_status=_str_or_none(_get(kw, "EditorialStatus", "editorial_status")),
             bid=amount,
             final_url=_first_final_url(kw),
             tracking_url_template=_get(kw, "TrackingUrlTemplate", "tracking_url_template"),
@@ -232,6 +238,11 @@ class AdSummary(BaseModel):
     id: str
     ad_type: str | None = None
     status: str | None = None
+    # Editorial (ad-review) status, distinct from `status` (Active/Paused): an ad can be Active
+    # but Disapproved (rejected, won't serve) or Inactive (pending review). Values: Active
+    # (approved), Inactive (under review), ActiveLimited (approved in some markets only),
+    # Disapproved (rejected). Check this first when an Active ad gets zero impressions.
+    editorial_status: str | None = None
     final_url: str | None = None
     # RSA copy, so an agent can show or clone an ad (e.g. recreate under a new brand/URL).
     headlines: list[str] = []
@@ -249,6 +260,7 @@ class AdSummary(BaseModel):
             id=str(_get(ad, "Id", "id")),
             ad_type=_str_or_none(_get(ad, "Type", "type")),
             status=_str_or_none(_get(ad, "Status", "status")),
+            editorial_status=_str_or_none(_get(ad, "EditorialStatus", "editorial_status")),
             final_url=_first_final_url(ad),
             headlines=_asset_texts(_get(ad, "Headlines", "headlines")),
             descriptions=_asset_texts(_get(ad, "Descriptions", "descriptions")),
@@ -537,6 +549,208 @@ class ReportResult(BaseModel):
     rows: list[ReportRow]
 
 
+# ---------------------------------------------------------------- Ad Insight (keyword research)
+# These come from the Ad Insight service (the programmatic Keyword Planner), not Campaign
+# Management. Every value is a *modeled estimate*, account-scoped, and Microsoft leaves fields
+# null when it has no data for a keyword/match type -- so treat missing numbers as "unknown".
+
+
+class BidEstimate(BaseModel):
+    """One match type's bid estimate for a target ad position, plus the traffic that bid buys.
+
+    ``estimated_min_bid`` is the headline number: the suggested bid to reach the requested position
+    (the "estimated first page bid" when the request targets ``FirstPage``). The per-week ranges
+    bracket the traffic that bid is modeled to deliver.
+
+    Heads-up on ``average_cpc`` / ``ctr``: per Microsoft these are derived from the *top* of the
+    range -- ``average_cpc = max_total_cost_per_week / max_clicks_per_week`` and
+    ``ctr = max_clicks_per_week / max_impressions_per_week * 100``. So ``average_cpc`` reflects the
+    aggressive (max-traffic) end and can sit *above* ``estimated_min_bid`` for very competitive
+    keywords -- that is Microsoft's formula, not a max-bid you would pay. The raw min/max cost and
+    clicks below let you recompute it for any point in the range.
+    """
+
+    match_type: str | None = None
+    estimated_min_bid: float | None = None
+    # Derived: max_total_cost_per_week / max_clicks_per_week (the avg CPC at the top of the range).
+    average_cpc: float | None = None
+    # Derived: max_clicks_per_week / max_impressions_per_week * 100.
+    ctr: float | None = None
+    min_clicks_per_week: float | None = None
+    max_clicks_per_week: float | None = None
+    min_impressions_per_week: int | None = None
+    max_impressions_per_week: int | None = None
+    min_total_cost_per_week: float | None = None
+    max_total_cost_per_week: float | None = None
+    currency_code: str | None = None
+
+    @classmethod
+    def from_sdk(cls, e: Any) -> BidEstimate:
+        return cls(
+            match_type=_str_or_none(_get(e, "MatchType", "match_type")),
+            estimated_min_bid=_get(e, "EstimatedMinBid", "estimated_min_bid"),
+            average_cpc=_get(e, "AverageCPC", "average_cpc"),
+            ctr=_get(e, "CTR", "ctr"),
+            min_clicks_per_week=_get(e, "MinClicksPerWeek", "min_clicks_per_week"),
+            max_clicks_per_week=_get(e, "MaxClicksPerWeek", "max_clicks_per_week"),
+            min_impressions_per_week=_to_int(
+                _get(e, "MinImpressionsPerWeek", "min_impressions_per_week")
+            ),
+            max_impressions_per_week=_to_int(
+                _get(e, "MaxImpressionsPerWeek", "max_impressions_per_week")
+            ),
+            min_total_cost_per_week=_get(e, "MinTotalCostPerWeek", "min_total_cost_per_week"),
+            max_total_cost_per_week=_get(e, "MaxTotalCostPerWeek", "max_total_cost_per_week"),
+            currency_code=_str_or_none(_get(e, "CurrencyCode", "currency_code")),
+        )
+
+
+class KeywordBidEstimate(BaseModel):
+    """Estimated bids for one keyword, one ``BidEstimate`` per requested match type.
+
+    ``estimates`` is empty when Microsoft has no bid data for the keyword.
+    """
+
+    keyword: str | None = None
+    estimates: list[BidEstimate] = []
+
+    @classmethod
+    def from_sdk(cls, k: Any) -> KeywordBidEstimate:
+        bids = _get(k, "EstimatedBids", "estimated_bids")
+        items = [b for b in bids if b is not None] if isinstance(bids, list) else []
+        return cls(
+            keyword=_get(k, "Keyword", "keyword"),
+            estimates=[BidEstimate.from_sdk(b) for b in items],
+        )
+
+
+class KeywordIdeaSummary(BaseModel):
+    """One suggested keyword from the Keyword Planner, with demand and competition signals.
+
+    ``avg_monthly_searches`` is the mean of the trailing ``monthly_search_counts`` window (kept as
+    a list so the agent can see seasonality). ``suggested_bid`` is a rough top-of-page bid and
+    ``competition`` is the advertiser-density bucket (Low / Medium / High).
+    """
+
+    keyword: str | None = None
+    source: str | None = None
+    avg_monthly_searches: int | None = None
+    monthly_search_counts: list[int] | None = None
+    suggested_bid: float | None = None
+    competition: str | None = None
+    relevance: float | None = None
+    ad_impression_share: float | None = None
+
+    @classmethod
+    def from_sdk(cls, k: Any) -> KeywordIdeaSummary:
+        counts = _int_list(_get(k, "MonthlySearchCounts", "monthly_search_counts"))
+        return cls(
+            keyword=_get(k, "Keyword", "keyword"),
+            source=_str_or_none(_get(k, "Source", "source")),
+            avg_monthly_searches=_avg(counts),
+            monthly_search_counts=counts or None,
+            suggested_bid=_get(k, "SuggestedBid", "suggested_bid"),
+            competition=_str_or_none(_get(k, "Competition", "competition")),
+            relevance=_get(k, "Relevance", "relevance"),
+            ad_impression_share=_get(k, "AdImpressionShare", "ad_impression_share"),
+        )
+
+
+class KeywordTrafficEstimate(BaseModel):
+    """Modeled weekly traffic for one keyword at a given max CPC, as a min..max bracket.
+
+    Microsoft returns a Minimum and Maximum ``TrafficEstimate`` per keyword; each field below is
+    that bracket flattened to ``min_*`` / ``max_*``. ``max_cpc`` echoes the bid the estimate was
+    requested at (filled in by the service layer, since the response omits it).
+    """
+
+    keyword: str | None = None
+    match_type: str | None = None
+    max_cpc: float | None = None
+    min_clicks: float | None = None
+    max_clicks: float | None = None
+    min_impressions: float | None = None
+    max_impressions: float | None = None
+    min_total_cost: float | None = None
+    max_total_cost: float | None = None
+    min_avg_cpc: float | None = None
+    max_avg_cpc: float | None = None
+    min_ctr: float | None = None
+    max_ctr: float | None = None
+    min_avg_position: float | None = None
+    max_avg_position: float | None = None
+
+    @classmethod
+    def from_sdk(cls, ke: Any) -> KeywordTrafficEstimate:
+        kw = _get(ke, "Keyword", "keyword")
+        lo = _get(ke, "Minimum", "minimum")
+        hi = _get(ke, "Maximum", "maximum")
+
+        def read(obj: Any, *names: str) -> Any:
+            """Read a field off a Minimum/Maximum/Keyword that may be absent."""
+            return _get(obj, *names) if obj is not None else None
+
+        return cls(
+            keyword=read(kw, "Text", "text"),
+            match_type=_str_or_none(read(kw, "MatchType", "match_type")),
+            min_clicks=read(lo, "Clicks", "clicks"),
+            max_clicks=read(hi, "Clicks", "clicks"),
+            min_impressions=read(lo, "Impressions", "impressions"),
+            max_impressions=read(hi, "Impressions", "impressions"),
+            min_total_cost=read(lo, "TotalCost", "total_cost"),
+            max_total_cost=read(hi, "TotalCost", "total_cost"),
+            min_avg_cpc=read(lo, "AverageCpc", "average_cpc"),
+            max_avg_cpc=read(hi, "AverageCpc", "average_cpc"),
+            min_ctr=read(lo, "Ctr", "ctr"),
+            max_ctr=read(hi, "Ctr", "ctr"),
+            min_avg_position=read(lo, "AveragePosition", "average_position"),
+            max_avg_position=read(hi, "AveragePosition", "average_position"),
+        )
+
+
+class FirstPageBidCheck(BaseModel):
+    """One keyword's bid vs. its estimated first-page bid (the "below first page bid" check).
+
+    ``current_bid`` is the keyword's effective max CPC: its own bid when set, otherwise the ad
+    group's default bid (``bid_source`` records which). ``below_first_page_bid`` is True when that
+    effective bid sits under ``estimated_first_page_bid`` -- the keyword likely won't show on the
+    first page -- and ``None`` when it can't be judged: Microsoft returned no estimate for the
+    keyword/match type, or the effective bid is unknown (no keyword bid and no ad-group default).
+    ``shortfall`` is how far the bid would need to rise to reach the estimate (only set when below).
+    """
+
+    keyword_id: str | None = None
+    keyword: str | None = None
+    match_type: str | None = None
+    status: str | None = None
+    editorial_status: str | None = None
+    current_bid: float | None = None
+    bid_source: str | None = None  # "keyword" (own bid) or "ad_group" (inherited default)
+    estimated_first_page_bid: float | None = None
+    below_first_page_bid: bool | None = None
+    shortfall: float | None = None
+    currency_code: str | None = None
+
+
+class FirstPageBidReport(BaseModel):
+    """An ad group's keywords checked against their first-page bid estimates.
+
+    ``keywords`` is ordered with the flagged (below-first-page) entries first and the largest
+    ``shortfall`` first, so the bids most in need of a raise surface at the top, then the adequately
+    bid keywords, then the undetermined ones. ``undetermined_count`` is keywords Microsoft returned
+    no estimate for -- treat those as "unknown", not "adequately bid".
+    """
+
+    ad_group_id: str
+    target_position: str
+    ad_group_default_bid: float | None = None
+    currency_code: str | None = None
+    keywords_checked: int
+    below_first_page_count: int
+    undetermined_count: int
+    keywords: list[FirstPageBidCheck] = []
+
+
 def _str_or_none(val: Any) -> str | None:
     """Stringify a value, unwrapping SDK enums to ``.value`` (not the ``Class.MEMBER`` repr)."""
     if val is None:
@@ -561,6 +775,33 @@ def _as_bool(val: Any) -> bool | None:
     if s in ("false", "0"):
         return False
     return None
+
+
+def _to_int(val: Any) -> int | None:
+    """Coerce an int-ish value (Ad Insight reports impression counts as strings) to an int."""
+    if val is None:
+        return None
+    try:
+        return int(float(val))
+    except TypeError, ValueError:
+        return None
+
+
+def _int_list(val: Any) -> list[int]:
+    """Parse a list of int-ish values (e.g. MonthlySearchCounts strings), dropping non-numeric."""
+    if not isinstance(val, list):
+        return []
+    out: list[int] = []
+    for v in val:
+        n = _to_int(v)
+        if n is not None:
+            out.append(n)
+    return out
+
+
+def _avg(values: list[int]) -> int | None:
+    """Mean of a non-empty int list, rounded to an int; None for an empty list."""
+    return round(sum(values) / len(values)) if values else None
 
 
 _MINUTE_NAME_TO_INT = {"Zero": 0, "Fifteen": 15, "Thirty": 30, "FortyFive": 45}

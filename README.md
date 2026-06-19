@@ -129,6 +129,10 @@ template at a level usually means it inherits the **account-level** default, whi
 `get_account_url_options` returns (tracking template, Final URL suffix, and
 `msclkid_auto_tagging_enabled` — the Microsoft Click ID that drives attribution). Confirm these
 before activating paused campaigns rather than assuming the per-campaign blanks mean "untracked".
+`get_ads` and `get_keywords` also surface `editorial_status` — the ad-review state (Active /
+Inactive / ActiveLimited / Disapproved), separate from the Active/Paused `status` — so you can
+tell whether an _Active_ ad or keyword is actually approved to serve (the first thing to check on
+zero impressions).
 `get_conversion_goals` reports each goal's `exclude_from_bidding` — the inverse of the UI's
 "Include in conversions" checkbox, i.e. whether the goal feeds automated bidding (ECPC / tCPA) —
 plus `count_type`, `conversion_window_in_minutes`, `goal_category`, and the revenue model; confirm
@@ -138,6 +142,17 @@ a goal is included before relying on it to steer spend.
 covering campaign / keyword / search-query / geographic reports. Supports a predefined
 `date_range` or a custom `start_date`/`end_date`, and scoping to a single `campaign_id` /
 `ad_group_id` / `account_id`.
+
+**Keyword research** (Ad Insight / Keyword Planner; read-only, registered even in `READ_ONLY`
+mode) — `estimate_keyword_bids` returns the estimated first-page (or mainline) bid per keyword
+(`estimated_min_bid`) with the modeled CPC/CTR/clicks/impressions/cost it buys;
+`get_keyword_ideas` discovers keywords from seed phrases and/or a landing-page URL with monthly
+search volume, a suggested bid, and a competition bucket (defaults to English / United States);
+and `get_keyword_traffic_estimates` projects weekly clicks / impressions / cost / position for
+keywords at a given max CPC. `check_first_page_bids(ad_group_id, campaign_id)` joins an ad group's
+live keyword bids to these estimates and flags the keywords bidding below their first-page bid (the
+"Below first page bid" delivery state), each with its `current_bid`, `estimated_first_page_bid`,
+and `shortfall`. Every value is a modeled estimate and may be `null` where Microsoft has no data.
 
 **Write** (only when `READ_ONLY=false`) — new campaigns / ad groups / ads are created **PAUSED**.
 
@@ -214,8 +229,9 @@ src/microsoft_ads_mcp/
     geo.py             # ZIP -> LocationId resolution (cached geo-locations file)
     bulk.py            # Bulk API upload/download (submit/poll)
     reporting.py       # submit/poll/download/parse
+    insights.py        # Ad Insight keyword research (bid/idea/traffic estimates)
   tools/
-    health.py read_tools.py write_tools.py reporting_tools.py auth_tools.py  # READ_ONLY-gated
+    health.py read_tools.py write_tools.py reporting_tools.py insight_tools.py auth_tools.py  # READ_ONLY-gated
 ```
 
 ## Development

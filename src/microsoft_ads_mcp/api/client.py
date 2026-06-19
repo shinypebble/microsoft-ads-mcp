@@ -26,6 +26,7 @@ CAMPAIGN = "CampaignManagementService"
 CUSTOMER = "CustomerManagementService"
 REPORTING = "ReportingService"
 BULK = "BulkService"
+AD_INSIGHT = "AdInsightService"
 _API_VERSION = 13
 
 

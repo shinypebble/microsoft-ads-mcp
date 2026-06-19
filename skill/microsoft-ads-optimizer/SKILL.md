@@ -51,6 +51,13 @@ write tool doesn't turn up, confirm `account_health.read_only` before assuming i
 - `get_campaigns` → `get_ad_groups(campaign_id)` → `get_keywords(ad_group_id)` /
   `get_ads(ad_group_id)` walks the hierarchy top-down. `get_ads` returns the RSA copy
   (`headlines` / `descriptions` / `path1` / `path2`) so you can show or clone an ad.
+- `get_ads` and `get_keywords` report `editorial_status` (the ad-review state: `Active` =
+  approved, `Inactive` = pending review, `ActiveLimited` = approved in some markets only,
+  `Disapproved` = rejected) **separate from** `status` (Active/Paused). An entity can be
+  `status="Active"` yet not serve because it's `Disapproved` or still under review — so when
+  diagnosing zero impressions, check `editorial_status` first, then bids (`check_first_page_bids`
+  flags every under-bid keyword in the ad group at once; `estimate_keyword_bids` prices one
+  keyword) and budget.
 - `get_budgets` gives a per-campaign budget view.
 - `run_performance_report(report_type, date_range)` returns parsed rows. Use
   `report_type="search_query"` to mine actual search terms for new keywords or negatives,
@@ -73,6 +80,40 @@ write tool doesn't turn up, confirm `account_health.read_only` before assuming i
 - `get_device_bid_adjustments(campaign_id)` reads the per-device bid modifiers (Computers /
   Smartphones / Tablets); an empty list means no modifier is set (every device at the base bid).
   Microsoft calls mobile **Smartphones** — there is no "Mobile".
+
+## Keyword research (Ad Insight / Keyword Planner)
+
+These three are **read-only and work even when `read_only` is true** — they query Microsoft's Ad
+Insight service (the programmatic Keyword Planner), not your account's entities. Everything they
+return is a *modeled estimate*, account-scoped, and may come back `null` where Microsoft has no
+data — treat missing numbers as "unknown", not "zero".
+
+- `estimate_keyword_bids(keywords, target_position="FirstPage", match_types=["Exact"])` — the
+  "estimated first page bid" per keyword. Each result's `estimated_min_bid` is the bid to reach
+  the target position (`FirstPage`, `MainLine`, or `MainLine1`), alongside the modeled
+  `average_cpc`, `ctr`, and weekly clicks/impressions/cost it buys. One entry per match type.
+  Use it to sanity-check bids before launching or when a keyword isn't serving. Treat
+  `estimated_min_bid` as the headline figure: `average_cpc` is Microsoft's derived
+  `max_total_cost / max_clicks` and can sit *above* `estimated_min_bid` for competitive keywords
+  (it's the avg CPC at the top of the traffic range, not a bid you'd pay).
+- `get_keyword_ideas(keywords=[...], url=..., language="English", location_ids=["190"])` —
+  keyword discovery from seed phrases and/or a landing-page URL. Returns `avg_monthly_searches`
+  (plus the monthly history for seasonality), a rough `suggested_bid`, and a `competition` bucket
+  (Low/Medium/High). Provide at least one of `keywords` or `url`; `location_ids` defaults to the
+  United States (`190`) and `language` must name exactly one language. Pair with the
+  `search_query` report (mining *your* terms) for a fuller expansion set.
+- `get_keyword_traffic_estimates(keywords, max_cpc, match_type="Exact")` — projects weekly
+  clicks / impressions / cost / position for keywords at a given bid, as a `min..max` bracket.
+  Use it to gauge volume and likely spend for a candidate keyword set before you build.
+- `check_first_page_bids(ad_group_id, campaign_id)` — the API-driven version of the UI's "Below
+  first page bid" delivery state. It reads the ad group's keywords (and the ad group's default
+  bid, which is why `campaign_id` is required), prices each keyword at its own match type, and
+  flags the ones whose effective bid (the keyword's own bid, or the inherited ad-group default —
+  `bid_source` says which) is under the first-page estimate. Returns the under-bid keywords first,
+  largest `shortfall` first, plus an `undetermined_count` for keywords Microsoft had no estimate
+  for (treat those as "unknown", not "adequately bid"). Reach for this — not a manual Keyword
+  Planner export — when a keyword serves but gets few/no impressions, or before activating a
+  campaign.
 
 ## Building from scratch (only when read_only is false)
 

@@ -17,12 +17,13 @@ def register_all(mcp: FastMCP, settings: Settings) -> None:
     ``settings.read_only`` is true, the write tools are never added to the server, so they
     cannot appear in ``list_tools`` or be invoked by any client.
     """
-    from . import auth_tools, health, read_tools, reporting_tools
+    from . import auth_tools, health, insight_tools, read_tools, reporting_tools
 
     health.register(mcp, settings)
     auth_tools.register(mcp, settings)
     read_tools.register(mcp)
     reporting_tools.register(mcp)
+    insight_tools.register(mcp)
 
     if not settings.read_only:
         from . import write_tools
