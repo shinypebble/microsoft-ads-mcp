@@ -117,14 +117,22 @@ deterministically instead of pattern-matching an error string.
 calls hit), `get_campaigns`, `get_ad_groups`, `get_keywords`, `get_ads` (includes the RSA copy:
 headlines / descriptions / paths), `get_budgets`, `get_negative_keywords`, `get_ad_extensions`,
 `get_conversion_goals`, `get_uet_tags`, `get_location_targets`, `get_location_intent`
-(presence vs. search-interest targeting), `resolve_postal_codes`
-(ZIP → Microsoft LocationId), `bulk_download`, `get_account_url_options`. The hierarchy reads
+(presence vs. search-interest targeting), `get_ad_schedules` (dayparting windows plus the
+campaign time zone they run in), `get_device_bid_adjustments` (per-device modifiers —
+Computers / Smartphones / Tablets), `resolve_postal_codes`
+(ZIP → Microsoft LocationId), `bulk_download`, `get_account_url_options`. `get_campaigns` also
+surfaces each campaign's `time_zone`, `start_date`, `languages`, `bid_strategy_type`, and
+`ad_schedule_use_searcher_time_zone`. The hierarchy reads
 (`get_campaigns`, `get_ad_groups`, `get_ads`, `get_keywords`) also surface each entity's URL
 tracking — `tracking_url_template`, `final_url_suffix`, and `url_custom_parameters`. A `null`
 template at a level usually means it inherits the **account-level** default, which
 `get_account_url_options` returns (tracking template, Final URL suffix, and
 `msclkid_auto_tagging_enabled` — the Microsoft Click ID that drives attribution). Confirm these
 before activating paused campaigns rather than assuming the per-campaign blanks mean "untracked".
+`get_conversion_goals` reports each goal's `exclude_from_bidding` — the inverse of the UI's
+"Include in conversions" checkbox, i.e. whether the goal feeds automated bidding (ECPC / tCPA) —
+plus `count_type`, `conversion_window_in_minutes`, `goal_category`, and the revenue model; confirm
+a goal is included before relying on it to steer spend.
 
 **Reporting** — `run_performance_report` (submit → poll → download → parse, returns rows),
 covering campaign / keyword / search-query / geographic reports. Supports a predefined
@@ -145,11 +153,27 @@ covering campaign / keyword / search-query / geographic reports. Supports a pred
 - *Negative keywords* — `add_negative_keywords`, `remove_negative_keywords` (campaign or ad-group
   scope).
 - *Ad extensions* — `add_call_extension`, `update_call_extension`, `add_callout_extension`,
-  `add_sitelink_extension`, `delete_ad_extension`.
-- *Conversion goals / UET tags* — `update_conversion_goal`, `update_uet_tag`.
+  `add_sitelink_extension`, `delete_ad_extension`. Call extensions accept
+  `is_call_tracking_enabled` (US/UK) to turn on Microsoft call tracking so call-from-ad
+  conversions are measured — pass it on `add_call_extension`, or flip it on an existing asset
+  with `update_call_extension`. New forwarding numbers are local (toll-free is no longer
+  provisioned). `get_ad_extensions` surfaces the current `is_call_tracking_enabled` flag.
+- *Conversion goals / UET tags* — `update_conversion_goal` edits a goal in place: rename, set
+  `status`, and (most launch-relevant) toggle `exclude_from_bidding` — the inverse of the UI's
+  "Include in conversions" checkbox, the single switch for whether a goal feeds automated bidding
+  (ECPC / tCPA). Also sets `count_type`, `conversion_window_in_minutes`, and the revenue model
+  (`revenue_type` / `revenue_value` / `revenue_currency_code`). `update_uet_tag` renames/redescribes
+  a tag.
 - *Location (ZIP/geo) targeting* — `add_location_targets`, `remove_location_targets`,
   `set_location_intent` (presence — `PeopleIn` — vs. search-interest targeting; one criterion
   per campaign, updated in place).
+- *Ad scheduling (dayparting)* — `add_ad_schedules`, `remove_ad_schedules` (day + time windows at
+  15-minute granularity; times run in the campaign time zone unless `use_searcher_time_zone` is
+  set). `update_campaign` accepts `time_zone` to set the zone those schedules run in.
+- *Device bid adjustments* — `set_device_bid_adjustment(campaign_id, device, bid_adjustment)` sets
+  a per-device modifier (-100 to 900 percent; -100 excludes the device). Microsoft calls mobile
+  **Smartphones** (there is no "Mobile"); "Computers" is desktop/laptop. Device criterions are
+  created as a set, so the first call also creates the other two at a neutral 0.
 - *Bulk API* — `bulk_upload`.
 
 The `update_*` tools patch in place: only the fields you pass change. Prefer them over

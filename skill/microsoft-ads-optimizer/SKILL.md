@@ -58,11 +58,21 @@ write tool doesn't turn up, confirm `account_health.read_only` before assuming i
   Pass `start_date`/`end_date` ("YYYY-MM-DD") for a custom window and `campaign_id`/`ad_group_id`
   to scope to one entity (e.g. confirm a repointed URL is serving for one campaign).
 - `get_negative_keywords`, `get_ad_extensions`, `get_conversion_goals`, `get_uet_tags`, and
-  `get_location_targets(campaign_id)` read the rest of the model.
+  `get_location_targets(campaign_id)` read the rest of the model. `get_conversion_goals` now
+  reports each goal's `exclude_from_bidding` (the inverse of "Include in conversions" — whether the
+  goal feeds automated bidding), plus `count_type`, `conversion_window_in_minutes`,
+  `goal_category`, and revenue, so you can confirm bid-eligibility without a UI trip.
 - `get_location_intent(campaign_id)` reads a campaign's location-intent setting — `PeopleIn`
   (presence: only people physically in the targeted locations) vs.
   `PeopleInOrSearchingForOrViewingPages` (Microsoft's default: also people searching
   for/viewing pages about them). Check this when geo performance looks off-target.
+- `get_ad_schedules(campaign_id)` reads a campaign's dayparting windows (day + time range) plus
+  the `time_zone` and `use_searcher_time_zone` flag they run in. A campaign with no windows
+  serves all hours. `get_campaigns` also now surfaces each campaign's `time_zone`, `start_date`,
+  `languages`, `bid_strategy_type`, and `ad_schedule_use_searcher_time_zone`.
+- `get_device_bid_adjustments(campaign_id)` reads the per-device bid modifiers (Computers /
+  Smartphones / Tablets); an empty list means no modifier is set (every device at the base bid).
+  Microsoft calls mobile **Smartphones** — there is no "Mobile".
 
 ## Building from scratch (only when read_only is false)
 
@@ -89,13 +99,40 @@ write tool doesn't turn up, confirm `account_health.read_only` before assuming i
   phone_number=..., country_code="US")` edits one in place; `delete_ad_extension(ids)` removes
   extension objects. Note `get_ad_extensions` only lists extensions *associated* at the queried
   scope, so a freshly created, unattached extension won't appear there.
-- Conversion goals / UET: `update_conversion_goal(goal_id, name)`, `update_uet_tag(tag_id, ...)`.
+  For call-from-ad conversion measurement, pass `is_call_tracking_enabled=true` (US/UK) on
+  `add_call_extension`, or flip it on an existing asset with
+  `update_call_extension(ad_extension_id, is_call_tracking_enabled=true)`. Microsoft then shows a
+  forwarding number; new ones are local (toll-free forwarding is no longer provisioned), so a
+  toll-free brand number gets a local tracking number. `get_ad_extensions` reports the current
+  `is_call_tracking_enabled` so you can confirm a plain number really has tracking on.
+- Conversion goals / UET: `update_conversion_goal(goal_id, ...)` edits a goal in place — rename,
+  set `status` ("Active"/"Paused"), and (the launch-relevant lever) toggle
+  `exclude_from_bidding`: the inverse of the UI's "Include in conversions" checkbox and the single
+  switch for whether a goal feeds automated bidding (ECPC/tCPA). `exclude_from_bidding=false`
+  includes it in the Conversions column and bid math; `true` drops it from both (still tracked
+  under All conversions). Also sets `count_type`, `conversion_window_in_minutes`, and revenue
+  (`revenue_type`/`revenue_value`/`revenue_currency_code`). `update_uet_tag(tag_id, ...)` renames a
+  tag. Before unpausing a campaign, confirm each goal you depend on reads
+  `exclude_from_bidding=false` via `get_conversion_goals`.
 - ZIP/location targeting: `resolve_postal_codes(["98101", ...])` → `add_location_targets(
   campaign_id, location_ids, exclude=False)`; remove by criterion id from `get_location_targets`.
 - Location intent (presence vs. broader reach): `set_location_intent(campaign_id, "PeopleIn")`
   to restrict to people physically in the targeted locations, or
   `"PeopleInOrSearchingForOrViewingPages"` for Microsoft's default. There's one criterion per
   campaign (auto-created), updated in place — read it first with `get_location_intent`.
+- Ad scheduling / dayparting: `add_ad_schedules(campaign_id, schedules)` where each window is
+  `{day, from_hour, from_minute, to_hour, to_minute, bid_adjustment}` (days "Monday".."Sunday",
+  minutes at 15-min granularity: 0/15/30/45). Windows are additive; remove one with
+  `remove_ad_schedules(campaign_id, criterion_ids)` using ids from `get_ad_schedules`. The hours
+  run in the campaign `time_zone` unless you pass `use_searcher_time_zone=true`; set the campaign
+  zone itself with `update_campaign(campaign_id, time_zone="CentralTimeUSCanada")`. Read the
+  current schedule first so you don't duplicate windows.
+- Device bid adjustments: `set_device_bid_adjustment(campaign_id, device, bid_adjustment)` sets a
+  per-device modifier (-100 to 900 percent; -100 excludes the device). `device` is "Computers"
+  (desktop/laptop), "Smartphones" (mobile — there is no "Mobile"), or "Tablets". Device criterions
+  are created as a set, so the first call for any device also creates the other two at a neutral 0;
+  later calls update the one device in place. A positive Smartphones modifier (+30-50%) is the core
+  lever for a click-to-call strategy. Read `get_device_bid_adjustments` first.
 - Cleanup: `delete_campaign` / `delete_ad_group` / `delete_ad` / `delete_keyword`.
 - Atomic bulk apply/export: `bulk_upload(entity_records)` and `bulk_download()`.
 
