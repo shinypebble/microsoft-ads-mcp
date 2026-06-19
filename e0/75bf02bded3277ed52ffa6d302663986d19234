@@ -1,0 +1,61 @@
+tests/test_tool_search.py
+  s_2dd60f58580011::t_8242f483573e78 51-59
+tests/test_extensions.py
+  s_2dd60f58580011::t_207c69f328dc34 54,64,68-97
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_2dd60f58580011::t_2fb4dab36d80fd 372-373,375-379
+src/microsoft_ads_mcp/services/extensions.py
+  s_2dd60f58580011::t_da3fbebbc05b7b 99,101-109,111-133
+src/microsoft_ads_mcp/services/reporting.py
+  s_2dd60f58580011::t_c76defe30223d2 161,165-173
+  s_2dd60f58580011::t_13c240f4551d07 162-164
+src/microsoft_ads_mcp/services/url_resolution.py
+  s_2dd60f58580011::t_c3693a8da0ee09 1-93
+tests/test_mutations.py
+  s_2dd60f58580011::t_9cf5da4f49e157 97-115,117-139,141-189
+  s_2dd60f58580011::t_29ac83fb7343e6 140
+  s_2dd60f58580011::t_e7ad7c4677b535 34-51
+  s_2dd60f58580011::t_75dc8bb0b8fec2 116
+tests/test_read_only_gating.py
+  s_2dd60f58580011::t_7e4a6fa82c1371 56
+src/microsoft_ads_mcp/tools/reporting_tools.py
+  s_2dd60f58580011::t_f7c7948c83ef6a 41-42
+src/microsoft_ads_mcp/services/mutations.py
+  s_2dd60f58580011::t_79b7281e99ccb0 511-531,533-545,547,549-550,552
+  s_2dd60f58580011::t_8f846daecc6bb4 262-264,269
+  s_2dd60f58580011::t_fd98da2f9acdc9 409-414
+  s_2dd60f58580011::t_019b51503a0f7f 565-603
+tests/test_url_resolution.py
+  s_2dd60f58580011::t_943407594e3907 1-35,42-80,84-113
+  s_2dd60f58580011::t_2295a2ae0d7ae5 36-41,81-83
+src/microsoft_ads_mcp/tools/read_tools.py
+  s_2dd60f58580011::t_ac6891dbcf2293 40
+  s_2dd60f58580011::t_9acef23afb1414 165,169-173,176-177
+  s_2dd60f58580011::t_eb13f0a054edcc 21
+  s_2dd60f58580011::t_3a569a15d52019 98-108,112-138
+src/microsoft_ads_mcp/domain/entities.py
+  s_2dd60f58580011::t_737b04dfabc98e 127-154
+tests/test_reporting_scope.py
+  s_2dd60f58580011::t_099bebe0cd02ef 38-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "e075bf02bded3277ed52ffa6d302663986d19234",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_2dd60f58580011": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eeceafa9-b351-427f-bea4-6e253abf1c43",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
