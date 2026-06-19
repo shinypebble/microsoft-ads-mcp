@@ -12,12 +12,12 @@ from __future__ import annotations
 from openapi_client.models.campaign.add_campaign_criterions_request import (
     AddCampaignCriterionsRequest,
 )
+from openapi_client.models.campaign.bid_multiplier import BidMultiplier
 from openapi_client.models.campaign.biddable_campaign_criterion import BiddableCampaignCriterion
 from openapi_client.models.campaign.campaign_criterion_type import CampaignCriterionType
 from openapi_client.models.campaign.delete_campaign_criterions_request import (
     DeleteCampaignCriterionsRequest,
 )
-from openapi_client.models.campaign.fixed_bid import FixedBid
 from openapi_client.models.campaign.get_campaign_criterions_by_ids_request import (
     GetCampaignCriterionsByIdsRequest,
 )
@@ -69,19 +69,28 @@ def add_location_targets(
                 )
             )
         else:
+            # A location bid adjustment is a percent multiplier (BidMultiplier), not an absolute
+            # bid; omit it entirely when no adjustment is requested.
+            criterion_bid = (
+                BidMultiplier(type="BidMultiplier", multiplier=bid_adjustment)
+                if bid_adjustment
+                else None
+            )
             criterions.append(
                 BiddableCampaignCriterion(
                     type="BiddableCampaignCriterion",
                     campaign_id=campaign_id,
                     criterion=location,
-                    criterion_bid=FixedBid(type="FixedBid", amount=bid_adjustment),
+                    criterion_bid=criterion_bid,
                 )
             )
     resp = client.call(
         CAMPAIGN,
         "add_campaign_criterions",
+        # Adds go under the umbrella "Targets" type; the specific "Location" type is only valid
+        # for get/delete filtering (the API rejects it on add with CampaignCriterionTypeInvalid).
         AddCampaignCriterionsRequest(
-            campaign_criterions=criterions, criterion_type=CampaignCriterionType.LOCATION
+            campaign_criterions=criterions, criterion_type=CampaignCriterionType.TARGETS
         ),
     )
     errors = nested_partial_errors(resp)
@@ -110,10 +119,11 @@ def remove_location_targets(
     resp = client.call(
         CAMPAIGN,
         "delete_campaign_criterions",
+        # Deletes also use the umbrella "Targets" type (not the specific "Location" type).
         DeleteCampaignCriterionsRequest(
             campaign_id=campaign_id,
             campaign_criterion_ids=criterion_ids,
-            criterion_type=CampaignCriterionType.LOCATION,
+            criterion_type=CampaignCriterionType.TARGETS,
         ),
     )
     errors = flat_partial_errors(resp)

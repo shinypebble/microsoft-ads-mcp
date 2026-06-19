@@ -8,13 +8,14 @@ request stays a clean partial. UET tags are a flat model, so a plain partial suf
 
 from __future__ import annotations
 
-from functools import reduce
-from operator import or_
 from typing import Any
 
 from openapi_client.models.campaign.conversion_goal_type import ConversionGoalType
 from openapi_client.models.campaign.get_conversion_goals_by_ids_request import (
     GetConversionGoalsByIdsRequest,
+)
+from openapi_client.models.campaign.get_conversion_goals_by_tag_ids_request import (
+    GetConversionGoalsByTagIdsRequest,
 )
 from openapi_client.models.campaign.get_uet_tags_by_ids_request import GetUetTagsByIdsRequest
 from openapi_client.models.campaign.uet_tag import UetTag
@@ -27,23 +28,48 @@ from ..api.client import CAMPAIGN, MsAdsClient
 from ..domain.entities import ConversionGoalSummary, MutationResult, UetTagSummary
 from . import as_list, first_attr, flat_partial_errors
 
-
-def _all_goal_types() -> ConversionGoalType:
-    """Every conversion goal type OR'd together (the type filter the get-call expects)."""
-    return reduce(or_, ConversionGoalType)
+# Curated goal-type filter the get-calls accept. The full OR of every type (and the bare app/
+# in-store members) is rejected with 400; this set covers the common web/app goal types.
+_GOAL_TYPES = (
+    ConversionGoalType.URL
+    | ConversionGoalType.EVENT
+    | ConversionGoalType.DURATION
+    | ConversionGoalType.PAGESVIEWEDPERVISIT
+    | ConversionGoalType.APPINSTALL
+    | ConversionGoalType.OFFLINECONVERSION
+)
 
 
 def get_conversion_goals(
     client: MsAdsClient, *, goal_ids: list[str] | None = None
 ) -> list[ConversionGoalSummary]:
-    """List conversion goals (all types). Pass ``goal_ids`` to fetch specific goals."""
-    resp = client.call(
-        CAMPAIGN,
-        "get_conversion_goals_by_ids",
-        GetConversionGoalsByIdsRequest(
-            conversion_goal_ids=goal_ids, conversion_goal_types=_all_goal_types()
-        ),
-    )
+    """List conversion goals. Pass ``goal_ids`` for specific goals, else list by UET tag.
+
+    Goals are reachable by id or by their UET tag; with no ``goal_ids`` we enumerate the
+    account's UET tags and fetch their goals (the by-ids call requires explicit ids).
+    """
+    if goal_ids:
+        resp = client.call(
+            CAMPAIGN,
+            "get_conversion_goals_by_ids",
+            GetConversionGoalsByIdsRequest(
+                conversion_goal_ids=goal_ids, conversion_goal_types=_GOAL_TYPES
+            ),
+        )
+    else:
+        tags = client.call(CAMPAIGN, "get_uet_tags_by_ids", GetUetTagsByIdsRequest(tag_ids=None))
+        tag_ids = [
+            str(first_attr(t, "Id", "id"))
+            for t in as_list(first_attr(tags, "UetTags", "uet_tags"))
+            if t is not None and first_attr(t, "Id", "id") is not None
+        ]
+        if not tag_ids:
+            return []
+        resp = client.call(
+            CAMPAIGN,
+            "get_conversion_goals_by_tag_ids",
+            GetConversionGoalsByTagIdsRequest(tag_ids=tag_ids, conversion_goal_types=_GOAL_TYPES),
+        )
     items = as_list(first_attr(resp, "ConversionGoals", "conversion_goals"))
     return [ConversionGoalSummary.from_sdk(g) for g in items if g is not None]
 
@@ -54,7 +80,7 @@ def update_conversion_goal(client: MsAdsClient, *, goal_id: str, name: str) -> M
         CAMPAIGN,
         "get_conversion_goals_by_ids",
         GetConversionGoalsByIdsRequest(
-            conversion_goal_ids=[goal_id], conversion_goal_types=_all_goal_types()
+            conversion_goal_ids=[goal_id], conversion_goal_types=_GOAL_TYPES
         ),
     )
     goals = [g for g in as_list(first_attr(fetched, "ConversionGoals", "conversion_goals")) if g]

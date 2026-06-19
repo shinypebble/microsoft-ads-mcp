@@ -8,8 +8,6 @@ number) is a single in-place ``update_ad_extensions`` and needs no re-associatio
 
 from __future__ import annotations
 
-from functools import reduce
-from operator import or_
 from typing import Any
 
 from openapi_client.models.campaign.ad_extension_id_to_entity_id_association import (
@@ -38,21 +36,39 @@ from . import as_list, first_attr, nested_partial_errors
 # Association scopes: which entity an extension is attached to.
 _ASSOCIATION_TYPES = ("Account", "Campaign", "AdGroup")
 
+# Default get-filter: the common, broadly-supported extension types. The full OR of every
+# member is rejected (400) by the get endpoints, so we use a curated set when none is given.
+_DEFAULT_TYPE_NAMES = (
+    "CALLADEXTENSION",
+    "CALLOUTADEXTENSION",
+    "SITELINKADEXTENSION",
+    "STRUCTUREDSNIPPETADEXTENSION",
+    "IMAGEADEXTENSION",
+    "PRICEADEXTENSION",
+    "PROMOTIONADEXTENSION",
+    "LOCATIONADEXTENSION",
+    "ACTIONADEXTENSION",
+)
 
-def _all_types() -> AdExtensionsTypeFilter:
-    """Every extension type OR'd together (the filter the get-calls require)."""
-    members = [m for m in AdExtensionsTypeFilter if m.name != "NONE"]
-    return reduce(or_, members)
+
+def _default_types() -> AdExtensionsTypeFilter:
+    """A curated set of common extension types the get-calls accept (full OR is rejected)."""
+    result: AdExtensionsTypeFilter | None = None
+    for name in _DEFAULT_TYPE_NAMES:
+        member = AdExtensionsTypeFilter[name]
+        result = member if result is None else result | member
+    assert result is not None
+    return result
 
 
 def _type_filter(extension_types: list[str] | None) -> AdExtensionsTypeFilter:
     """Resolve friendly type names (e.g. "Call", "Sitelink") to a combined flag.
 
     Names match case-insensitively, with or without the trailing "AdExtension"; ``None``
-    returns the all-types filter.
+    returns the curated default set.
     """
     if not extension_types:
-        return _all_types()
+        return _default_types()
 
     def norm(s: str) -> str:
         return s.upper().replace("ADEXTENSION", "").replace("_", "").replace(" ", "")
@@ -67,7 +83,7 @@ def _type_filter(extension_types: list[str] | None) -> AdExtensionsTypeFilter:
         if member is None:
             raise ValueError(f"unknown ad extension type {name!r}")
         result = member if result is None else result | member
-    return result if result is not None else _all_types()
+    return result if result is not None else _default_types()
 
 
 def _check_association(association_type: str) -> None:

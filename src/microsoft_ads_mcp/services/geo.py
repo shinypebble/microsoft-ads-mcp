@@ -65,9 +65,11 @@ def _download_geo_csv(client: MsAdsClient, locale: str) -> str:
 def _index_postal_codes(csv_text: str) -> dict[str, str]:
     """Build a ``{POSTAL_CODE -> LocationId}`` index from the geo CSV.
 
-    The file's column layout can vary, so we locate columns by header name and index every
-    "Postal Code"-type row by whichever code-bearing column is present, skipping rows marked
-    ``PendingDeprecation``.
+    The Microsoft geo file has columns ``Location Id, Bing Display Name, Location Type,
+    Replaces, Status, AdWords Location Id``. For a ``PostalCode`` row the ZIP is the first
+    pipe-delimited segment of the display name (e.g. ``98052|Washington|United States``). A
+    dedicated code column is used instead if a future locale provides one. Rows marked
+    ``PendingDeprecation`` are skipped.
     """
     reader = csv.reader(io.StringIO(csv_text))
     rows = iter(reader)
@@ -85,9 +87,10 @@ def _index_postal_codes(csv_text: str) -> dict[str, str]:
     id_col = col("location id", "locationid")
     type_col = col("location type", "locationtype")
     status_col = col("status")
-    code_cols = [c for c in (col("code"), col("postal code"), col("name")) if c is not None]
-    if id_col is None or not code_cols:
-        raise MsAdsApiError(0, "Unexpected geo-locations file format (missing id/code columns)")
+    code_col = col("code", "postal code")
+    name_col = col("bing display name", "display name", "name")
+    if id_col is None or (code_col is None and name_col is None):
+        raise MsAdsApiError(0, "Unexpected geo-locations file format (missing id/name columns)")
 
     index: dict[str, str] = {}
     for row in rows:
@@ -105,10 +108,14 @@ def _index_postal_codes(csv_text: str) -> dict[str, str]:
             and row[status_col].strip().lower() == "pendingdeprecation"
         ):
             continue
-        loc_id = row[id_col].strip()
-        for c in code_cols:
-            if len(row) > c and row[c].strip():
-                index.setdefault(row[c].strip().upper(), loc_id)
+        if code_col is not None and len(row) > code_col and row[code_col].strip():
+            code = row[code_col].strip()
+        elif name_col is not None and len(row) > name_col and row[name_col].strip():
+            code = row[name_col].split("|", 1)[0].strip()
+        else:
+            continue
+        if code:
+            index.setdefault(code.upper(), row[id_col].strip())
     return index
 
 

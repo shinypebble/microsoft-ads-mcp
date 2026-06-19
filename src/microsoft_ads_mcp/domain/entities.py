@@ -279,7 +279,10 @@ class LocationCriterionSummary(BaseModel):
             location_type=_get(crit, "LocationType", "location_type") if crit else None,
             display_name=_get(crit, "DisplayName", "display_name") if crit else None,
             is_excluded="Negative" in ctype,
-            bid_adjustment=_get(bid, "Amount", "amount") if bid else None,
+            # Location bid adjustments are BidMultiplier (Multiplier); other bids use Amount.
+            bid_adjustment=(
+                _get(bid, "Multiplier", "multiplier", "Amount", "amount") if bid else None
+            ),
         )
 
 
