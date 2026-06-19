@@ -38,7 +38,8 @@ def register(mcp: FastMCP) -> None:
             account_id: Report on this account instead of the configured one.
             campaign_id: Narrow the report to a single campaign.
             ad_group_id: Narrow the report to a single ad group (keyword/search_query/geographic
-                reports only).
+                reports only). Requires campaign_id as well — the report scope needs the parent
+                campaign to identify the ad group.
         """
         return guarded(
             lambda: reporting.run_performance_report(

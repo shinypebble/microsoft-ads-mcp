@@ -51,7 +51,7 @@ def test_get_ad_extensions_two_step_and_maps() -> None:
             ),
         ]
     )
-    out = extensions.get_ad_extensions(client)
+    out = extensions.get_ad_extensions(client, association_type="Account")
     assert [c[1] for c in client.calls] == [
         "get_ad_extension_ids_by_account_id",
         "get_ad_extensions_by_ids",
@@ -61,8 +61,40 @@ def test_get_ad_extensions_two_step_and_maps() -> None:
 
 def test_get_ad_extensions_short_circuits_when_empty() -> None:
     client = _ScriptedClient([SimpleNamespace(ad_extension_ids=[])])
-    assert extensions.get_ad_extensions(client) == []
+    assert extensions.get_ad_extensions(client, association_type="Account") == []
     assert len(client.calls) == 1  # never fetches details when there are no ids
+
+
+def test_get_ad_extensions_default_enumerates_all_scopes_and_dedupes() -> None:
+    # The default scope now sweeps Account + Campaign + AdGroup so campaign-attached extensions are
+    # visible (the old Account-only default returned [] when extensions lived on the campaign). Ids
+    # seen in more than one scope are de-duped before the single details fetch.
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(ad_extension_ids=[]),  # Account: none
+            SimpleNamespace(ad_extension_ids=["55", "56"]),  # Campaign
+            SimpleNamespace(ad_extension_ids=["55"]),  # AdGroup: dup of 55
+            SimpleNamespace(
+                ad_extensions=[
+                    SimpleNamespace(id="55", type="CalloutAdExtension", status="Active"),
+                    SimpleNamespace(id="56", type="SitelinkAdExtension", status="Active"),
+                ]
+            ),
+        ]
+    )
+    out = extensions.get_ad_extensions(client)
+    methods = [c[1] for c in client.calls]
+    assert methods == [
+        "get_ad_extension_ids_by_account_id",
+        "get_ad_extension_ids_by_account_id",
+        "get_ad_extension_ids_by_account_id",
+        "get_ad_extensions_by_ids",
+    ]
+    # Each id-enumeration call targets a distinct scope, in order.
+    assert [c[2].association_type for c in client.calls[:3]] == ["Account", "Campaign", "AdGroup"]
+    # The details fetch receives de-duped ids (55 once, not twice).
+    assert client.calls[3][2].ad_extension_ids == ["55", "56"]
+    assert [e.id for e in out] == ["55", "56"]
 
 
 def test_update_call_extension_is_partial_with_discriminator() -> None:

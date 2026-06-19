@@ -48,6 +48,15 @@ def test_search_discovers_hidden_tool() -> None:
     assert "update_campaign" in found  # reachable via search even though it's not listed
 
 
+def test_search_discovers_effective_url_settings() -> None:
+    # Issue 14: the URL-options family must be reachable by the terms agents actually search.
+    found = _search(
+        Settings(**_BASE, read_only=False, tool_search=True),
+        "effective tracking url template inherited account settings",
+    )
+    assert "get_effective_url_settings" in found
+
+
 def test_read_only_hides_write_tools_from_search() -> None:
     # Write tools aren't registered under READ_ONLY, so search (which runs through the full
     # pipeline) cannot surface them — the gate holds even with discovery on.

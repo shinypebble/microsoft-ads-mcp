@@ -124,6 +124,34 @@ class AccountUrlOptions(BaseModel):
         )
 
 
+class EffectiveUrlSettings(BaseModel):
+    """The URL tracking that actually applies to an entity, plus the level that set each field.
+
+    Microsoft resolves URL tracking by override order (keyword > ad > ad group > campaign >
+    account): a value set at a deeper level wins, otherwise it inherits from its parent, ultimately
+    the account. Reading a single entity is therefore misleading -- ``get_campaigns`` can show
+    ``tracking_url_template: null`` while the account-level template is what really applies. This
+    flattens that resolution for a campaign (or one of its ad groups) so you see the effective value
+    AND where it came from, without manually cross-referencing ``get_account_url_options`` and the
+    per-entity reads. Each ``*_source`` is "ad_group", "campaign", or "account" -- or null when the
+    field is unset at every level. (URL custom parameters have no account level, so they resolve
+    only down to the campaign.)
+    """
+
+    level: str  # the entity this was resolved for: "campaign" or "ad_group"
+    campaign_id: str
+    ad_group_id: str | None = None
+    effective_tracking_url_template: str | None = None
+    tracking_url_template_source: str | None = None
+    effective_final_url_suffix: str | None = None
+    final_url_suffix_source: str | None = None
+    effective_url_custom_parameters: dict[str, str] | None = None
+    url_custom_parameters_source: str | None = None
+    # The account-level Microsoft Click ID (msclkid) auto-tagging flag that drives attribution; it
+    # has no per-entity override, so it is reported straight from the account.
+    msclkid_auto_tagging_enabled: bool | None = None
+
+
 class CampaignSummary(BaseModel):
     id: str
     name: str | None = None

@@ -158,10 +158,19 @@ def _build_scope(
             raise ValueError(
                 "ad_group_id filtering needs report_type 'keyword', 'search_query', or 'geographic'"
             )
-        scope_kwargs: dict[str, Any] = {"account_id": account, "ad_group_id": str(ad_group_id)}
-        if campaign_id is not None:
-            scope_kwargs["campaign_id"] = str(campaign_id)
-        return scope_cls(ad_groups=[AdGroupReportScope(**scope_kwargs)])
+        if campaign_id is None:
+            # AdGroupReportScope requires the parent CampaignId to identify the ad group; sending
+            # AdGroupId alone makes the request malformed and the API 400s with a bare "Bad
+            # Request". Fail fast with a clear message (turned into a ToolError before any
+            # round-trip) instead of leaking that.
+            raise ValueError("campaign_id is required when filtering by ad_group_id")
+        return scope_cls(
+            ad_groups=[
+                AdGroupReportScope(
+                    account_id=account, campaign_id=str(campaign_id), ad_group_id=str(ad_group_id)
+                )
+            ]
+        )
     if campaign_id is not None:
         return scope_cls(
             campaigns=[CampaignReportScope(account_id=account, campaign_id=str(campaign_id))]

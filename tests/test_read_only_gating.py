@@ -53,6 +53,7 @@ READ_TOOLS = {
     "bulk_download",
     "run_performance_report",
     "get_account_url_options",
+    "get_effective_url_settings",
 }
 
 

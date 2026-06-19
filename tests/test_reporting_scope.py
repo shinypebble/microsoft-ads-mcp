@@ -35,6 +35,15 @@ def test_ad_group_filter_requires_capable_scope() -> None:
         )
 
 
+def test_ad_group_filter_requires_campaign_id() -> None:
+    # AdGroupReportScope needs the parent CampaignId; passing ad_group_id alone made the request
+    # malformed and the API 400'd with a bare "Bad Request". Now it fails fast and clearly.
+    with pytest.raises(ValueError, match="campaign_id is required"):
+        reporting._build_scope(
+            AccountThroughAdGroupReportScope, account="123", campaign_id=None, ad_group_id="9"
+        )
+
+
 def test_ad_group_filter_on_capable_scope() -> None:
     scope = reporting._build_scope(
         AccountThroughAdGroupReportScope,

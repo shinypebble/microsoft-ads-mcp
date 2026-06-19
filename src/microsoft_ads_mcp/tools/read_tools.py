@@ -18,6 +18,7 @@ from ..domain.entities import (
     CampaignSummary,
     ConversionGoalSummary,
     DeviceBidAdjustmentSummary,
+    EffectiveUrlSettings,
     KeywordSummary,
     LocationCriterionSummary,
     LocationIntentSummary,
@@ -36,6 +37,7 @@ from ..services import (
     extensions,
     geo,
     negatives,
+    url_resolution,
 )
 from ._common import guarded
 
@@ -93,15 +95,47 @@ def register(mcp: FastMCP) -> None:
 
     @mcp.tool(tags={"read"}, annotations=_READ)
     def get_account_url_options() -> AccountUrlOptions:
-        """Read the account-level URL tracking that every campaign inherits.
+        """Read the account-level URL tracking / tracking template that every campaign inherits.
 
-        This is where the tracking template / Final URL suffix usually live; per-campaign,
-        ad-group, ad, and keyword values are typically blank and inherit from here, so check
-        this (not just the hierarchy) to confirm how clicks are tracked.
-        `msclkid_auto_tagging_enabled` is what appends the Microsoft Click ID (msclkid) for
-        conversion attribution. Confirm these before activating paused campaigns.
+        This is the account-level URL options: the tracking template (tracking URL template),
+        Final URL suffix, msclkid auto-tagging, and parallel tracking that per-campaign, ad-group,
+        ad, and keyword values inherit. Those per-entity values are typically blank and inherit
+        from here, so this answers "where is the tracking template set?" and how UTM / msclkid
+        click tracking is configured -- check this (not just the entity hierarchy) to confirm how
+        clicks are tracked. `msclkid_auto_tagging_enabled` is what appends the Microsoft Click ID
+        (msclkid) for conversion attribution. Confirm these before activating paused campaigns. To
+        see the *resolved* (effective) value for a specific campaign or ad group and which level
+        set it, see `get_effective_url_settings`; to change these, see `set_account_url_options`.
         """
         return guarded(lambda: account_properties.get_account_url_options(get_client()))
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_effective_url_settings(
+        campaign_id: str, ad_group_id: str | None = None
+    ) -> EffectiveUrlSettings:
+        """Resolve the effective URL tracking (tracking template, Final URL suffix, URL custom
+        parameters) for a campaign or ad group, and which level set each.
+
+        URL tracking follows Microsoft's inherited / override order (keyword > ad > ad group >
+        campaign > account): a value set at a deeper level wins, otherwise it inherits from its
+        parent, ultimately the account-level URL options. So a campaign or ad group can show a null
+        tracking template while the account template is what actually applies. This walks that
+        inheritance chain and returns the effective tracking_url_template / final_url_suffix /
+        url_custom_parameters plus a `*_source` ("ad_group", "campaign", or "account") for each, so
+        you do not have to manually cross-reference `get_account_url_options` with the per-entity
+        reads. Also surfaces `msclkid_auto_tagging_enabled`. Use it to answer "what tracking
+        template actually applies here, and where is it set?" before activating a campaign.
+
+        Args:
+            campaign_id: The campaign id to resolve settings for.
+            ad_group_id: Optional ad group id (within that campaign) to resolve at the ad-group
+                level; omit to resolve at the campaign level.
+        """
+        return guarded(
+            lambda: url_resolution.get_effective_url_settings(
+                get_client(), campaign_id=campaign_id, ad_group_id=ad_group_id
+            )
+        )
 
     @mcp.tool(tags={"read"}, annotations=_READ)
     def get_negative_keywords(
@@ -128,14 +162,19 @@ def register(mcp: FastMCP) -> None:
     @mcp.tool(tags={"read"}, annotations=_READ)
     def get_ad_extensions(
         extension_types: list[str] | None = None,
-        association_type: str = "Account",
+        association_type: str | None = None,
     ) -> list[AdExtensionSummary]:
         """List ad extensions in the account (call, callout, sitelink, etc.).
 
+        By default this enumerates all association scopes (Account, Campaign, AdGroup) and merges
+        them, so extensions attached at the campaign or ad-group level are included — most
+        extensions are associated to a campaign, not the account, so scoping to Account alone often
+        looks empty. Pass an explicit association_type to narrow to one scope.
+
         Args:
             extension_types: Optional filter, e.g. ["Call", "Sitelink"]; defaults to all types.
-            association_type: Scope to enumerate ids from: "Account", "Campaign", or "AdGroup"
-                (default "Account").
+            association_type: Scope to enumerate ids from: "Account", "Campaign", or "AdGroup".
+                Omit (default) to search all three scopes and de-dupe.
         """
         return guarded(
             lambda: extensions.get_ad_extensions(

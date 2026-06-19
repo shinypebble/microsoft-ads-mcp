@@ -369,11 +369,14 @@ def register(mcp: FastMCP) -> None:
         msclkid_auto_tagging_enabled: bool | None = None,
         ad_click_parallel_tracking: bool | None = None,
     ) -> MutationResult:
-        """Set account-level URL options (applies account-wide; every campaign inherits them).
+        """Set account-level URL options / tracking template (applies account-wide; every campaign
+        inherits them).
 
-        The cleanest way to apply a tracking template / Final URL suffix across the whole account
-        at once, instead of editing each campaign/ad/keyword. Only the fields you pass change.
-        Read the current values first with get_account_url_options.
+        The cleanest way to apply a tracking template (tracking URL template), Final URL suffix,
+        msclkid auto-tagging, or parallel tracking across the whole account at once -- the inherited
+        URL settings -- instead of editing each campaign/ad/keyword. Only the fields you pass
+        change. Read the current values first with get_account_url_options, and use
+        get_effective_url_settings to confirm what a given campaign/ad group resolves to afterward.
 
         Args:
             tracking_url_template: Account tracking template, e.g.

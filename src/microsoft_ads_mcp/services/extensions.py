@@ -96,21 +96,41 @@ def get_ad_extensions(
     client: MsAdsClient,
     *,
     extension_types: list[str] | None = None,
-    association_type: str = "Account",
+    association_type: str | None = None,
 ) -> list[AdExtensionSummary]:
-    """List ad extensions in the account, optionally filtered by type."""
-    _check_association(association_type)
+    """List ad extensions in the account, optionally filtered by type.
+
+    ``association_type`` selects which association scope to enumerate ids from. By default
+    (``None``) all three scopes -- Account, Campaign, AdGroup -- are enumerated and merged
+    (de-duped by id), so extensions attached only at the campaign or ad-group level are still
+    returned. That is the common case: most extensions are associated to a campaign, not the
+    account, so the old Account-only default returned ``[]`` even when extensions existed. Pass an
+    explicit "Account", "Campaign", or "AdGroup" to enumerate just that scope.
+    """
     type_filter = _type_filter(extension_types)
-    ids_resp = client.call(
-        CAMPAIGN,
-        "get_ad_extension_ids_by_account_id",
-        GetAdExtensionIdsByAccountIdRequest(
-            account_id=client.account_id,
-            association_type=association_type,
-            ad_extension_type=type_filter,
-        ),
-    )
-    ext_ids = [str(i) for i in as_list(first_attr(ids_resp, "AdExtensionIds", "ad_extension_ids"))]
+    if association_type is None:
+        scopes = list(_ASSOCIATION_TYPES)
+    else:
+        _check_association(association_type)
+        scopes = [association_type]
+
+    ext_ids: list[str] = []
+    seen: set[str] = set()
+    for scope in scopes:
+        ids_resp = client.call(
+            CAMPAIGN,
+            "get_ad_extension_ids_by_account_id",
+            GetAdExtensionIdsByAccountIdRequest(
+                account_id=client.account_id,
+                association_type=scope,
+                ad_extension_type=type_filter,
+            ),
+        )
+        for i in as_list(first_attr(ids_resp, "AdExtensionIds", "ad_extension_ids")):
+            sid = str(i)
+            if sid not in seen:
+                seen.add(sid)
+                ext_ids.append(sid)
     if not ext_ids:
         return []
     resp = client.call(

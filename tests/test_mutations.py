@@ -31,6 +31,24 @@ class _FakeClient:
         return _Resp()
 
 
+class _ConstClient:
+    """Returns one fixed response for every call (for inspecting partial-error handling)."""
+
+    account_id = "123"
+
+    def __init__(self, resp: Any) -> None:
+        self._resp = resp
+        self.calls: list[tuple[str, str, Any]] = []
+
+    def call(self, service: str, method: str, request: Any) -> Any:
+        self.calls.append((service, method, request))
+        return self._resp
+
+
+def _batch_error(code: str, message: str = "") -> Any:
+    return SimpleNamespace(error_code=code, message=message)
+
+
 def test_update_campaign_sends_only_changed_fields() -> None:
     client = _FakeClient()
     result = mutations.update_campaign(client, campaign_id="1", name="GCF_Search_Core_US")
@@ -74,6 +92,99 @@ def test_delete_campaigns_echoes_ids_and_reports_count() -> None:
     _, method, request = client.calls[0]
     assert method == "delete_campaigns"
     assert request.account_id == "123" and request.campaign_ids == ["100", "200"]
+
+
+def test_delete_campaign_idempotent_when_already_deleted() -> None:
+    # Re-deleting an already-Deleted campaign returns CampaignServiceInvalidCampaignStatus; we treat
+    # that as a no-op success rather than leaking the raw error (issue 13).
+    resp = SimpleNamespace(
+        partial_errors=[
+            _batch_error(
+                "CampaignServiceInvalidCampaignStatus",
+                "The campaign status is invalid for the current operation.",
+            )
+        ]
+    )
+    client = _ConstClient(resp)
+    result = mutations.delete_campaigns(client, campaign_ids=["100"])
+    assert result.ok and result.ids == ["100"]
+    assert "already deleted" in result.message
+    assert result.partial_errors == []  # the idempotent error is suppressed
+
+
+def test_delete_campaign_still_reports_real_errors() -> None:
+    # A real failure mixed with an already-deleted one still fails, surfacing only the real error.
+    resp = SimpleNamespace(
+        partial_errors=[
+            _batch_error("CampaignServiceInvalidCampaignStatus", "already gone"),
+            _batch_error("CampaignServiceEditorialError", "boom"),
+        ]
+    )
+    client = _ConstClient(resp)
+    result = mutations.delete_campaigns(client, campaign_ids=["100", "200"])
+    assert not result.ok
+    assert result.partial_errors == ["CampaignServiceEditorialError: boom"]
+
+
+def test_delete_campaign_idempotent_when_not_found() -> None:
+    # A ...DoesNotExist code (never existed) is also treated as a no-op.
+    resp = SimpleNamespace(
+        partial_errors=[_batch_error("CampaignServiceCampaignDoesNotExist", "no such campaign")]
+    )
+    result = mutations.delete_campaigns(_ConstClient(resp), campaign_ids=["999"])
+    assert result.ok and result.partial_errors == []
+
+
+def test_create_rsa_preserves_dki_function() -> None:
+    # A {KeyWord:...} headline longer than 30 literal chars must NOT be sliced (that drops the
+    # closing brace -> InvalidFunctionFormat); only the rendered keyword counts toward 30 (iss. 19).
+    client = _ConstClient(SimpleNamespace(ad_ids=["9"]))
+    result = mutations.create_responsive_search_ad(
+        client,
+        ad_group_id="7",
+        final_url="https://getconnectedfast.com/move/",
+        headlines=["{KeyWord:Internet When You Move}", "Plain headline"],
+        descriptions=["A description"],
+    )
+    assert result.ok
+    texts = [h.asset.text for h in client.calls[0][2].ads[0].headlines]
+    assert texts[0] == "{KeyWord:Internet When You Move}"  # intact, brace preserved
+
+
+def test_create_rsa_truncates_plain_headline() -> None:
+    client = _ConstClient(SimpleNamespace(ad_ids=["9"]))
+    mutations.create_responsive_search_ad(
+        client,
+        ad_group_id="7",
+        final_url="https://x.test/",
+        headlines=["A" * 40],
+        descriptions=["d"],
+    )
+    assert client.calls[0][2].ads[0].headlines[0].asset.text == "A" * 30
+
+
+def test_create_rsa_rejects_unbalanced_braces() -> None:
+    client = _FakeClient()
+    result = mutations.create_responsive_search_ad(
+        client,
+        ad_group_id="7",
+        final_url="https://x.test/",
+        headlines=["{KeyWord:Foo"],
+        descriptions=["d"],
+    )
+    assert not result.ok
+    assert "unbalanced" in result.partial_errors[0]
+    assert client.calls == []  # rejected before any API call
+
+
+def test_update_rsa_rejects_unbalanced_braces() -> None:
+    client = _FakeClient()
+    result = mutations.update_responsive_search_ad(
+        client, ad_group_id="7", ad_id="9", headlines=["{KeyWord:Foo"]
+    )
+    assert not result.ok and result.ids == ["9"]
+    assert "unbalanced" in result.partial_errors[0]
+    assert client.calls == []
 
 
 def test_invalid_status_is_rejected() -> None:

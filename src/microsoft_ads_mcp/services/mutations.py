@@ -259,11 +259,14 @@ def create_responsive_search_ad(
     url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
     """Create a paused Responsive Search Ad (RSA)."""
+    headline_links, err = _prepare_headlines(headlines)
+    if err is not None:
+        return MutationResult(ok=False, message="RSA create failed", partial_errors=[err])
     ad = ResponsiveSearchAd(
         type="ResponsiveSearch",
         status="Paused",
         final_urls=[final_url],
-        headlines=[_asset_link(h[:30]) for h in headlines[:15]],
+        headlines=headline_links,
         descriptions=[_asset_link(d[:90]) for d in descriptions[:4]],
         **_present(
             tracking_url_template=tracking_url_template,
@@ -403,7 +406,12 @@ def update_responsive_search_ad(
     if final_url is not None:
         fields["final_urls"] = [final_url]
     if headlines is not None:
-        fields["headlines"] = [_asset_link(h[:30]) for h in headlines[:15]]
+        headline_links, err = _prepare_headlines(headlines)
+        if err is not None:
+            return MutationResult(
+                ok=False, message="Update failed", ids=[str(ad_id)], partial_errors=[err]
+            )
+        fields["headlines"] = headline_links
     if descriptions is not None:
         fields["descriptions"] = [_asset_link(d[:90]) for d in descriptions[:4]]
     ad = ResponsiveSearchAd(id=ad_id, type="ResponsiveSearch", **fields)
@@ -500,15 +508,48 @@ def delete_keywords(
     return _delete_result(resp, keyword_ids, "keyword")
 
 
+# Delete error codes that mean "the entity is already gone" -- an already-Deleted entity
+# (CampaignServiceInvalid*Status) or one that never existed (...DoesNotExist). Deleting something
+# that is already deleted is the caller's intent, so we treat these as a no-op success rather than a
+# failure. Seeded from the documented campaign code; the ...DoesNotExist suffix below catches the
+# per-entity not-found codes generically. Widen this set if the live API reports other codes.
+_IDEMPOTENT_DELETE_CODES = frozenset(
+    {
+        "CampaignServiceInvalidCampaignStatus",
+        "CampaignServiceInvalidAdGroupStatus",
+        "CampaignServiceInvalidAdStatus",
+        "CampaignServiceInvalidKeywordStatus",
+    }
+)
+
+
+def _is_idempotent_delete_error(error: str) -> bool:
+    """True when a delete partial error means the entity is already gone (safe to ignore)."""
+    code = error.split(":", 1)[0].strip()
+    return code in _IDEMPOTENT_DELETE_CODES or code.endswith("DoesNotExist")
+
+
 def _delete_result(resp: Any, ids: list[str], label: str) -> MutationResult:
-    """Delete responses carry only PartialErrors; success is the absence of errors."""
-    errors = _partial_errors(resp)
+    """Delete responses carry only PartialErrors; success is the absence of *real* errors.
+
+    Deletes are idempotent: an "already deleted / does not exist" partial error is treated as a
+    no-op (the entity is gone, which is what the caller wanted) instead of a failure, so re-running
+    a delete -- or deleting an already-``Deleted`` campaign -- returns ``ok`` rather than leaking a
+    raw ``CampaignServiceInvalidCampaignStatus``.
+    """
+    real_errors = [e for e in _partial_errors(resp) if not _is_idempotent_delete_error(e)]
+    already_gone = [e for e in _partial_errors(resp) if _is_idempotent_delete_error(e)]
+    if real_errors:
+        return MutationResult(
+            ok=False, message="Delete failed", ids=[str(i) for i in ids], partial_errors=real_errors
+        )
     n = len(ids)
+    note = f" ({len(already_gone)} already deleted/not found)" if already_gone else ""
     return MutationResult(
-        ok=not errors,
-        message=f"Deleted {n} {label}{'s' if n != 1 else ''}" if not errors else "Delete failed",
+        ok=True,
+        message=f"Deleted {n} {label}{'s' if n != 1 else ''}{note}",
         ids=[str(i) for i in ids],
-        partial_errors=errors,
+        partial_errors=[],
     )
 
 
@@ -519,6 +560,45 @@ def _asset_link(text: str) -> AssetLink:
     subtype; a plain dict deserializes into the base ``Asset`` and fails to serialize.
     """
     return AssetLink(asset=TextAsset(type="TextAsset", text=text))
+
+
+def _balanced_braces(text: str) -> bool:
+    """True when ``{``/``}`` are balanced and never close before they open (DKI doesn't nest)."""
+    depth = 0
+    for ch in text:
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
+
+
+def _truncate_headline(text: str) -> str:
+    """Cap a headline at 30 chars, but never truncate inside a dynamic-text function.
+
+    A headline may embed a keyword-insertion / customizer function like ``{KeyWord:Default Text}``.
+    The 30-char display limit applies to the *rendered* text, not the literal markup (which
+    Microsoft validates itself), so blindly slicing the literal to 30 chars would chop the closing
+    brace and corrupt the function (-> ``InvalidFunctionFormat``). When the headline contains a
+    function (any ``{``), pass it through untouched; otherwise apply the plain 30-char cap.
+    """
+    return text if "{" in text else text[:30]
+
+
+def _prepare_headlines(headlines: list[str]) -> tuple[list[AssetLink] | None, str | None]:
+    """Validate and DKI-aware-truncate up to 15 headlines into AssetLinks.
+
+    Returns ``(asset_links, None)`` on success, or ``(None, message)`` naming the first headline
+    whose dynamic-text braces are unbalanced -- so the caller can return a clear ``ok=false``
+    instead of passing corrupted markup through to Bing's opaque ``InvalidFunctionFormat``.
+    """
+    selected = headlines[:15]
+    for h in selected:
+        if not _balanced_braces(h):
+            return None, f"Headline has unbalanced {{ }} braces (check dynamic-text syntax): {h!r}"
+    return [_asset_link(_truncate_headline(h)) for h in selected], None
 
 
 def _unwrap(value: Any, *keys: str) -> Any:
