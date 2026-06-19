@@ -1,0 +1,37 @@
+tests/test_extensions.py
+  s_f40a7d29533141::t_c1a34a522067e7 99-102,105,132-135,141-149
+  s_f40a7d29533141::t_b51ccfef5da78e 81-98,103-104,106-131
+  s_f40a7d29533141::t_ed270b6849153e 136-140
+src/microsoft_ads_mcp/services/extensions.py
+  s_f40a7d29533141::t_518f2c4c70061c 270,274-280,286
+  s_f40a7d29533141::t_d85fc781733e12 127-141,151-172
+  s_f40a7d29533141::t_e7c2ed90298c79 149,180-181
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_f40a7d29533141::t_5264511dcd1084 574,584-586,596
+  s_f40a7d29533141::t_7781f94ca311b5 493,506-509,518
+  s_f40a7d29533141::t_1a2b67f66c7f75 495-499,503-504
+src/microsoft_ads_mcp/domain/entities.py
+  s_f40a7d29533141::t_78ce2be8fbf021 257-259
+  s_f40a7d29533141::t_ed270b6849153e 274
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "a3495c5ebd5a221fe33d3aa35c47b1ec70279646",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_f40a7d29533141": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ad2bbbe9-b0a2-459e-b70e-a5c4ae05153f",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
