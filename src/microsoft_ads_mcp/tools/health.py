@@ -65,6 +65,6 @@ def register(mcp: FastMCP, settings: Settings) -> None:
             environment=settings.environment,
             user_name=first_attr(user, "UserName", "user_name"),
             account_id=str(client.account_id) if client.account_id else None,
-            customer_id=str(settings.customer_id) or None,
+            customer_id=str(client.customer_id) if client.customer_id else None,
             message="Connected." + (" Read-only mode." if settings.read_only else ""),
         )

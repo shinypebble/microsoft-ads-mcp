@@ -14,7 +14,7 @@ from bingads.service_client import ServiceClient
 
 from ..config import Settings
 from .auth import build_authorization_data
-from .errors import translate
+from .errors import InvalidCredentialsError, translate
 
 if TYPE_CHECKING:
     from bingads.authorization import AuthorizationData
@@ -38,15 +38,27 @@ class MsAdsClient:
         self._services: dict[str, ServiceClient] = {}
         # Cached account/user metadata, populated by health/overview tools.
         self.account: dict[str, Any] | None = None
+        # Session scope from set_active_account. Held separately from the cached
+        # AuthorizationData so it survives an auth reset (see _reset_auth).
+        self._account_override: str | None = None
+        self._customer_override: str | None = None
 
     @property
     def settings(self) -> Settings:
         return self._settings
 
     def authorization(self) -> AuthorizationData:
-        """Return the cached ``AuthorizationData``, building (and authenticating) it once."""
+        """Return the cached ``AuthorizationData``, building (and authenticating) it once.
+
+        Reapplies any session scope from ``set_account`` after a (re)build so a credential
+        reset never silently reverts to the configured account (see ``_reset_auth``).
+        """
         if self._auth is None:
             self._auth = build_authorization_data(self._settings)
+            if self._account_override is not None:
+                self._auth.account_id = self._account_override
+            if self._customer_override is not None:
+                self._auth.customer_id = self._customer_override
         return self._auth
 
     @property
@@ -60,13 +72,33 @@ class MsAdsClient:
     def set_account(self, account_id: str, customer_id: str | None = None) -> None:
         """Switch the active account (and optionally customer) for subsequent calls.
 
-        Mutates the cached ``AuthorizationData`` in place and drops the per-service client cache
-        so the next call binds to the new scope. The OAuth credential is unchanged.
+        Records the scope as a session override (so it survives an auth reset), mutates the
+        cached ``AuthorizationData`` in place, and drops the per-service client cache so the
+        next call binds to the new scope. The OAuth credential is unchanged.
         """
+        self._account_override = account_id
+        if customer_id is not None:
+            self._customer_override = customer_id
         auth = self.authorization()
         auth.account_id = account_id
         if customer_id is not None:
             auth.customer_id = customer_id
+        self._services.clear()
+
+    def _reset_auth(self) -> None:
+        """Drop the cached credential and service clients so the next call re-authenticates.
+
+        A long-running server caches its ``AuthorizationData`` (and the access token in its
+        grant) for the life of the process. If that access token's refresh later fails or the
+        grant goes stale, every subsequent call stays wedged on a credential error even though
+        the persisted refresh token is still valid. Clearing the cache lets the next call rebuild
+        from the currently persisted token, so the server self-heals instead of needing a restart.
+
+        Only the credential is dropped: the session scope from ``set_account`` is kept (on
+        ``_account_override``/``_customer_override``) and reapplied by ``authorization`` on the
+        rebuild, so a reauth never reverts to the configured account.
+        """
+        self._auth = None
         self._services.clear()
 
     def service(self, name: str) -> ServiceClient:
@@ -94,10 +126,26 @@ class MsAdsClient:
 
         The REST SDK names every method's request kwarg as the method name plus ``_request``
         (e.g. ``add_campaigns(add_campaigns_request=...)``). Errors are translated.
+
+        Self-heals a stale cached credential: if the call is rejected for auth reasons *and* we
+        were running off a previously-built credential, the cache is dropped and the call retried
+        once against a freshly rebuilt one. A failure with no cached credential (a genuinely bad
+        token) is not retried -- a rebuild would only reproduce it.
         """
-        svc = self.service(service_name)
-        fn = getattr(svc, method)
-        return self.execute(lambda: fn(**{f"{method}_request": request}))
+
+        def op() -> Any:
+            svc = self.service(service_name)
+            fn = getattr(svc, method)
+            return fn(**{f"{method}_request": request})
+
+        had_cached_auth = self._auth is not None
+        try:
+            return self.execute(op)
+        except InvalidCredentialsError:
+            if not had_cached_auth:
+                raise
+            self._reset_auth()
+            return self.execute(op)
 
 
 # ----------------------------------------------------------------- module singleton

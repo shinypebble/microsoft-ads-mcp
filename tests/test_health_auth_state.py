@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 from types import SimpleNamespace
 
+import pytest
+from fastmcp import FastMCP
+
 from microsoft_ads_mcp.api.errors import InvalidCredentialsError, MsAdsApiError
+from microsoft_ads_mcp.tools import health
 from microsoft_ads_mcp.tools.health import _classify_auth_error
 
 # A stand-in settings object with a dev token present (decoupled from any .env on disk).
@@ -50,3 +55,35 @@ def test_non_credential_inactive_account() -> None:
     # A non-auth API error mentioning inactivity is an account problem, not a token problem.
     state, needs = _classify_auth_error(_OK, MsAdsApiError(400, "account is not active"))
     assert state == "account_inactive" and needs is False
+
+
+def _run_account_health(monkeypatch: pytest.MonkeyPatch, client: object, settings: object):
+    """Register account_health with stubbed client/get_user and return its AccountHealth."""
+    monkeypatch.setattr(health, "get_client", lambda: client)
+    monkeypatch.setattr(health, "get_user", lambda _client: SimpleNamespace(user_name="Tester"))
+    mcp = FastMCP("test")
+    health.register(mcp, settings)
+    tool = asyncio.run(mcp.get_tool("account_health"))
+    return tool.fn()
+
+
+def test_health_reports_live_client_scope(monkeypatch: pytest.MonkeyPatch) -> None:
+    # account_health must report the *live* client scope so it reflects set_active_account,
+    # not the static config. Here the client points at a switched account/customer while the
+    # settings still hold the originals; account_health must follow the client (issue 9).
+    client = SimpleNamespace(account_id="999", customer_id="555")
+    settings = SimpleNamespace(
+        read_only=False, environment="production", account_id="123", customer_id="111"
+    )
+    result = _run_account_health(monkeypatch, client, settings)
+    assert result.ok and result.account_id == "999" and result.customer_id == "555"
+
+
+def test_health_customer_id_none_is_null_not_string(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A missing customer id must serialize as null, never the literal string "None".
+    client = SimpleNamespace(account_id="123", customer_id=None)
+    settings = SimpleNamespace(
+        read_only=True, environment="production", account_id="123", customer_id=None
+    )
+    result = _run_account_health(monkeypatch, client, settings)
+    assert result.account_id == "123" and result.customer_id is None
