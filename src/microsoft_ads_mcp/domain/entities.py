@@ -43,6 +43,41 @@ Network = Literal[
     # (still some partner traffic, not pure owned-and-operated).
     "OwnedAndOperatedOnly",
 ]
+# A campaign's inline (campaign-level) bid strategy -- the BiddingScheme.Type. These are the
+# settable schemes Microsoft's UI offers for Search campaigns; spellings are the SDK
+# `BiddingScheme.Type` discriminator names used verbatim. Note a read/write quirk: for TargetRoas
+# and MaxConversionValue the discriminator the API *returns* is the long class-name form
+# ("TargetRoasBiddingScheme" / "MaxConversionValueBiddingScheme"), so `get_campaigns` reports those
+# long forms -- the write path accepts either form (it normalizes the trailing "BiddingScheme"), so
+# a value read back can be passed straight to update_campaign. Distinct from a *portfolio* strategy
+# applied by `bid_strategy_id`; you set one or the other, not both.
+BidStrategyType = Literal[
+    "EnhancedCpc",
+    "ManualCpc",
+    "MaxClicks",
+    "MaxConversions",
+    "TargetCpa",
+    "MaxConversionValue",
+    "TargetRoas",
+]
+# The set the *write* tools accept: the settable short forms above plus the two long class-name
+# discriminators the API hands back for them (the read/write quirk noted above). `get_campaigns`
+# reports "TargetRoasBiddingScheme" / "MaxConversionValueBiddingScheme" for those strategies, and
+# the write path normalizes either form (`mutations._bidding_scheme`), so this superset lets a value
+# read from get_campaigns round-trip straight into create_campaign / update_campaign instead of
+# being rejected at the tool boundary by the schema enum. Kept explicit (not derived from
+# BidStrategyType) so static checkers can read the members; keep the short forms in sync with it.
+BidStrategyTypeInput = Literal[
+    "EnhancedCpc",
+    "ManualCpc",
+    "MaxClicks",
+    "MaxConversions",
+    "TargetCpa",
+    "MaxConversionValue",
+    "TargetRoas",
+    "TargetRoasBiddingScheme",
+    "MaxConversionValueBiddingScheme",
+]
 # Conversion-goal bidding / value knobs. Microsoft's enum spellings, used verbatim so they map
 # straight onto the API. (Goal status reuses CampaignStatus -- Active / Paused.)
 ConversionCountType = Literal["All", "Unique"]
@@ -179,8 +214,17 @@ class CampaignSummary(BaseModel):
     time_zone: str | None = None
     start_date: str | None = None  # "YYYY-MM-DD", or null when the campaign has no explicit start
     languages: list[str] | None = None
-    # The bid strategy (BiddingScheme.Type), e.g. "EnhancedCpc", "MaxConversions".
+    # The bid strategy (BiddingScheme.Type), e.g. "EnhancedCpc", "MaxConversions". Settable via
+    # update_campaign / create_campaign (bid_strategy_type); see the BidStrategyType Literal.
     bid_strategy_type: str | None = None
+    # The bid strategy's parameters, read back so a cap/target can be inspected and re-passed on
+    # update (which rewrites the scheme whole, else the value clears). max_cpc is the Maximum CPC
+    # limit (MaxClicks / MaxConversions / TargetCpa / TargetRoas / MaxConversionValue); target_cpa
+    # the Target CPA (TargetCpa / MaxConversions); target_roas the Target ROAS (TargetRoas /
+    # MaxConversionValue). null when the scheme lacks that knob or it isn't set.
+    max_cpc: float | None = None
+    target_cpa: float | None = None
+    target_roas: float | None = None
     # When true, ad-schedule hours are interpreted in each searcher's time zone, not the campaign's.
     # Only populated when get_campaigns requests it; null means "not reported".
     ad_schedule_use_searcher_time_zone: bool | None = None
@@ -195,6 +239,7 @@ class CampaignSummary(BaseModel):
         if isinstance(ctype, list):
             ctype = ", ".join(str(t) for t in ctype) or None
         scheme = _get(c, "BiddingScheme", "bidding_scheme")
+        max_cpc_bid = _get(scheme, "MaxCpc", "max_cpc") if scheme is not None else None
         return cls(
             id=str(_get(c, "Id", "id")),
             name=_get(c, "Name", "name"),
@@ -208,6 +253,9 @@ class CampaignSummary(BaseModel):
             bid_strategy_type=(
                 _str_or_none(_get(scheme, "Type", "type")) if scheme is not None else None
             ),
+            max_cpc=(_get(max_cpc_bid, "Amount", "amount") if max_cpc_bid is not None else None),
+            target_cpa=(_get(scheme, "TargetCpa", "target_cpa") if scheme is not None else None),
+            target_roas=(_get(scheme, "TargetRoas", "target_roas") if scheme is not None else None),
             ad_schedule_use_searcher_time_zone=_get(
                 c, "AdScheduleUseSearcherTimeZone", "ad_schedule_use_searcher_time_zone"
             ),

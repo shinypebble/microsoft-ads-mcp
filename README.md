@@ -121,7 +121,8 @@ headlines / descriptions / paths), `get_budgets`, `get_negative_keywords`, `get_
 campaign time zone they run in), `get_device_bid_adjustments` (per-device modifiers —
 Computers / Smartphones / Tablets), `resolve_postal_codes`
 (ZIP → Microsoft LocationId), `bulk_download`, `get_account_url_options`. `get_campaigns` also
-surfaces each campaign's `time_zone`, `start_date`, `languages`, `bid_strategy_type`, and
+surfaces each campaign's `time_zone`, `start_date`, `languages`, `bid_strategy_type` (plus its
+stored `max_cpc` / `target_cpa` / `target_roas` when the scheme carries them), and
 `ad_schedule_use_searcher_time_zone`. `get_ad_groups` surfaces each ad group's `network` (ad
 distribution: the entire Microsoft Advertising Network vs. Microsoft sites and select traffic only).
 The hierarchy reads
@@ -165,6 +166,11 @@ and `shortfall`. Every value is a modeled estimate and may be `null` where Micro
   group, ad, keyword) accept `tracking_url_template`, `final_url_suffix`, and
   `url_custom_parameters` (a `{key: value}` map, referenced in templates as `{_key}`).
   `create_ad_group` / `update_ad_group` also accept `network` (ad distribution).
+  `create_campaign` / `update_campaign` also accept `bid_strategy_type` to set the campaign's
+  inline bid strategy (`EnhancedCpc`, `ManualCpc`, `MaxClicks`, `MaxConversions`, `TargetCpa`,
+  `MaxConversionValue`, `TargetRoas`) with optional `max_cpc` / `target_cpa` / `target_roas` —
+  e.g. `MaxClicks` + `max_cpc` is Maximize Clicks with a Maximum CPC limit (distinct from
+  `bid_strategy_id`, which applies a portfolio strategy; set one or the other).
 - *Account-level URL options* — `set_account_url_options` sets the tracking template, Final URL
   suffix, and `msclkid` auto-tagging once for the whole account (every campaign inherits them) —
   the cleanest single-point lever for an account-wide tracking/rebrand change.

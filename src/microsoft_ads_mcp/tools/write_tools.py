@@ -10,6 +10,7 @@ from mcp.types import ToolAnnotations
 from ..api.client import get_client
 from ..domain.entities import (
     AdScheduleInput,
+    BidStrategyTypeInput,
     CampaignStatus,
     ConversionCountType,
     ConversionRevenueType,
@@ -39,6 +40,10 @@ def register(mcp: FastMCP) -> None:
         name: str,
         daily_budget: float,
         description: str = "",
+        bid_strategy_type: BidStrategyTypeInput | None = None,
+        max_cpc: float | None = None,
+        target_cpa: float | None = None,
+        target_roas: float | None = None,
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
         url_custom_parameters: dict[str, str] | None = None,
@@ -49,6 +54,13 @@ def register(mcp: FastMCP) -> None:
             name: Campaign name.
             daily_budget: Daily budget in account currency.
             description: Optional description.
+            bid_strategy_type: The campaign's inline bid strategy. Omit to inherit Microsoft's
+                default (EnhancedCpc). One of "EnhancedCpc", "ManualCpc", "MaxClicks",
+                "MaxConversions", "TargetCpa", "MaxConversionValue", "TargetRoas".
+            max_cpc: Optional Maximum CPC limit (account currency) for MaxClicks / MaxConversions /
+                TargetCpa / MaxConversionValue / TargetRoas. Not valid for EnhancedCpc / ManualCpc.
+            target_cpa: Target CPA (account currency) for TargetCpa / MaxConversions.
+            target_roas: Target ROAS for TargetRoas / MaxConversionValue.
             tracking_url_template: Optional tracking template applied to all URLs in the
                 campaign (e.g. "{lpurl}?utm_source=bing").
             final_url_suffix: Optional Final URL suffix appended to landing-page URLs.
@@ -61,6 +73,10 @@ def register(mcp: FastMCP) -> None:
                 name=name,
                 daily_budget=daily_budget,
                 description=description,
+                bid_strategy_type=bid_strategy_type,
+                max_cpc=max_cpc,
+                target_cpa=target_cpa,
+                target_roas=target_roas,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,
                 url_custom_parameters=url_custom_parameters,
@@ -88,6 +104,10 @@ def register(mcp: FastMCP) -> None:
         daily_budget: float | None = None,
         status: CampaignStatus | None = None,
         bid_strategy_id: str | None = None,
+        bid_strategy_type: BidStrategyTypeInput | None = None,
+        max_cpc: float | None = None,
+        target_cpa: float | None = None,
+        target_roas: float | None = None,
         time_zone: str | None = None,
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
@@ -100,7 +120,23 @@ def register(mcp: FastMCP) -> None:
             name: New campaign name (rename).
             daily_budget: New daily budget in account currency.
             status: "Active" or "Paused".
-            bid_strategy_id: Id of a portfolio bid strategy to apply.
+            bid_strategy_id: Id of a portfolio (shared) bid strategy to apply. Mutually exclusive
+                with bid_strategy_type.
+            bid_strategy_type: Set the campaign's own inline bid strategy (BiddingScheme): one of
+                "EnhancedCpc", "ManualCpc", "MaxClicks", "MaxConversions", "TargetCpa",
+                "MaxConversionValue", "TargetRoas". e.g. "MaxClicks" (+ optional max_cpc) is
+                Maximize Clicks with a Maximum CPC limit. The long-form value get_campaigns returns
+                for TargetRoas / MaxConversionValue ("TargetRoasBiddingScheme" /
+                "MaxConversionValueBiddingScheme") is also accepted, so a read value round-trips.
+                Mutually exclusive with bid_strategy_id.
+            max_cpc: Optional Maximum CPC limit (account currency) for MaxClicks / MaxConversions /
+                TargetCpa / MaxConversionValue / TargetRoas. Not valid for EnhancedCpc / ManualCpc.
+                get_campaigns reports the current value; re-pass it when changing bid_strategy_type
+                or the existing cap may be cleared (the scheme is rewritten as a whole).
+            target_cpa: Target CPA (account currency) for TargetCpa / MaxConversions. get_campaigns
+                reports the current value; re-pass it to preserve it (see max_cpc).
+            target_roas: Target ROAS for TargetRoas / MaxConversionValue. get_campaigns reports the
+                current value; re-pass it to preserve it (see max_cpc).
             time_zone: Campaign time zone (Microsoft code, e.g. "CentralTimeUSCanada"); ad
                 schedules run in this zone. Read the current value from get_campaigns.
             tracking_url_template: Tracking template for all URLs in the campaign.
@@ -116,6 +152,10 @@ def register(mcp: FastMCP) -> None:
                 daily_budget=daily_budget,
                 status=status,
                 bid_strategy_id=bid_strategy_id,
+                bid_strategy_type=bid_strategy_type,
+                max_cpc=max_cpc,
+                target_cpa=target_cpa,
+                target_roas=target_roas,
                 time_zone=time_zone,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,

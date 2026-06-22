@@ -62,6 +62,36 @@ def test_campaign_summary_surfaces_url_tracking() -> None:
     assert summary.url_custom_parameters == {"season": "summer", "region": "us"}
 
 
+def test_campaign_summary_surfaces_max_cpc_cap() -> None:
+    # A MaxClicks scheme with a Maximum CPC limit: the cap (a nested Bid.Amount) must read back so
+    # it can be re-passed on update -- otherwise a partial update would clear it.
+    c = SimpleNamespace(
+        id=487928625,
+        name="GCF_Search_Core_US",
+        bidding_scheme=SimpleNamespace(type="MaxClicks", max_cpc=SimpleNamespace(amount=2.5)),
+    )
+    summary = CampaignSummary.from_sdk(c)
+    assert summary.bid_strategy_type == "MaxClicks"
+    assert summary.max_cpc == 2.5
+    assert summary.target_cpa is None and summary.target_roas is None
+
+
+def test_campaign_summary_surfaces_target_cpa() -> None:
+    c = SimpleNamespace(id=1, bidding_scheme=SimpleNamespace(type="TargetCpa", target_cpa=25.0))
+    summary = CampaignSummary.from_sdk(c)
+    assert summary.bid_strategy_type == "TargetCpa"
+    assert summary.target_cpa == 25.0
+    assert summary.max_cpc is None
+
+
+def test_campaign_summary_bid_strategy_params_none_without_scheme() -> None:
+    summary = CampaignSummary.from_sdk(SimpleNamespace(id=1, name="x"))
+    assert summary.bid_strategy_type is None
+    assert summary.max_cpc is None
+    assert summary.target_cpa is None
+    assert summary.target_roas is None
+
+
 def test_keyword_summary_surfaces_final_url_and_blank_tracking() -> None:
     # A keyword that inherits everything: Final URL set, no keyword-level overrides.
     kw = SimpleNamespace(

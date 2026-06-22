@@ -76,7 +76,8 @@ write tool doesn't turn up, confirm `account_health.read_only` before assuming i
 - `get_ad_schedules(campaign_id)` reads a campaign's dayparting windows (day + time range) plus
   the `time_zone` and `use_searcher_time_zone` flag they run in. A campaign with no windows
   serves all hours. `get_campaigns` also now surfaces each campaign's `time_zone`, `start_date`,
-  `languages`, `bid_strategy_type`, and `ad_schedule_use_searcher_time_zone`.
+  `languages`, `bid_strategy_type` (plus the scheme's stored `max_cpc` / `target_cpa` /
+  `target_roas` when set), and `ad_schedule_use_searcher_time_zone`.
 - `get_device_bid_adjustments(campaign_id)` reads the per-device bid modifiers (Computers /
   Smartphones / Tablets); an empty list means no modifier is set (every device at the base bid).
   Microsoft calls mobile **Smartphones** — there is no "Mobile".
@@ -128,6 +129,12 @@ data — treat missing numbers as "unknown", not "zero".
 
 - Rename / rebudget / restatus: `update_campaign`, `update_ad_group`, `update_keyword`. Only the
   fields you pass change (the rest are untouched).
+- Switch a campaign's bid strategy: `update_campaign(campaign_id, bid_strategy_type=...)` sets the
+  inline scheme (`EnhancedCpc`, `MaxClicks`, `MaxConversions`, `TargetCpa`, `TargetRoas`,
+  `MaxConversionValue`, `ManualCpc`). `MaxClicks` + optional `max_cpc` is Maximize Clicks with a
+  Maximum CPC limit — useful to drop the conversion dependency on a new campaign with no recorded
+  conversions ("Conversion tracking: Limiting delivery"). Read the current value from
+  `get_campaigns` (`bid_strategy_type`).
 - Repoint a Final URL or refresh copy without recreating the ad:
   `update_responsive_search_ad(ad_group_id, ad_id, final_url=...)`. Get `ad_id` from `get_ads`.
 - Tracking templates / Final URL suffixes are supported on campaign, ad group, and ad

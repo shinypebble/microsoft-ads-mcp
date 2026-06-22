@@ -15,6 +15,7 @@ from openapi_client.models.campaign.add_campaigns_request import AddCampaignsReq
 from openapi_client.models.campaign.add_keywords_request import AddKeywordsRequest
 from openapi_client.models.campaign.asset_link import AssetLink
 from openapi_client.models.campaign.bid import Bid
+from openapi_client.models.campaign.bidding_scheme import BiddingScheme
 from openapi_client.models.campaign.campaign import Campaign
 from openapi_client.models.campaign.custom_parameter import CustomParameter
 from openapi_client.models.campaign.custom_parameters import CustomParameters
@@ -22,9 +23,20 @@ from openapi_client.models.campaign.delete_ad_groups_request import DeleteAdGrou
 from openapi_client.models.campaign.delete_ads_request import DeleteAdsRequest
 from openapi_client.models.campaign.delete_campaigns_request import DeleteCampaignsRequest
 from openapi_client.models.campaign.delete_keywords_request import DeleteKeywordsRequest
+from openapi_client.models.campaign.enhanced_cpc_bidding_scheme import EnhancedCpcBiddingScheme
 from openapi_client.models.campaign.get_campaigns_by_ids_request import GetCampaignsByIdsRequest
 from openapi_client.models.campaign.keyword import Keyword
+from openapi_client.models.campaign.manual_cpc_bidding_scheme import ManualCpcBiddingScheme
+from openapi_client.models.campaign.max_clicks_bidding_scheme import MaxClicksBiddingScheme
+from openapi_client.models.campaign.max_conversion_value_bidding_scheme import (
+    MaxConversionValueBiddingScheme,
+)
+from openapi_client.models.campaign.max_conversions_bidding_scheme import (
+    MaxConversionsBiddingScheme,
+)
 from openapi_client.models.campaign.responsive_search_ad import ResponsiveSearchAd
+from openapi_client.models.campaign.target_cpa_bidding_scheme import TargetCpaBiddingScheme
+from openapi_client.models.campaign.target_roas_bidding_scheme import TargetRoasBiddingScheme
 from openapi_client.models.campaign.text_asset import TextAsset
 from openapi_client.models.campaign.update_ad_groups_request import UpdateAdGroupsRequest
 from openapi_client.models.campaign.update_ads_request import UpdateAdsRequest
@@ -80,6 +92,66 @@ def _validate_network(network: str | None) -> None:
         )
 
 
+# A campaign's inline bid strategy (BiddingScheme) keyed by friendly type, paired with the optional
+# knobs that scheme accepts. The SDK subclass stamps the right BiddingScheme.Type itself, so we just
+# instantiate it. `max_cpc` is a Bid(amount=...); `target_cpa` / `target_roas` are plain floats.
+_BIDDING_SCHEMES: dict[str, tuple[type[BiddingScheme], tuple[str, ...]]] = {
+    "EnhancedCpc": (EnhancedCpcBiddingScheme, ()),
+    "ManualCpc": (ManualCpcBiddingScheme, ()),
+    "MaxClicks": (MaxClicksBiddingScheme, ("max_cpc",)),
+    "MaxConversions": (MaxConversionsBiddingScheme, ("max_cpc", "target_cpa")),
+    "TargetCpa": (TargetCpaBiddingScheme, ("max_cpc", "target_cpa")),
+    "MaxConversionValue": (MaxConversionValueBiddingScheme, ("max_cpc", "target_roas")),
+    "TargetRoas": (TargetRoasBiddingScheme, ("max_cpc", "target_roas")),
+}
+
+
+def _bidding_scheme(
+    bid_strategy_type: str | None,
+    *,
+    max_cpc: float | None = None,
+    target_cpa: float | None = None,
+    target_roas: float | None = None,
+) -> BiddingScheme | None:
+    """Build a campaign's inline ``BiddingScheme`` from a friendly type plus optional knobs.
+
+    Returns None when no type is given, so the field is omitted from a partial update. Each knob is
+    only valid on the schemes that use it (see ``_BIDDING_SCHEMES``); TargetCpa / TargetRoas usually
+    need their target set, but that's left to Microsoft to enforce so a clean partial error surfaces
+    rather than a guess. ``get_campaigns`` returns the long ``*BiddingScheme`` discriminator for
+    TargetRoas / MaxConversionValue, so we accept that form too (strip the suffix) to round-trip.
+    """
+    knobs = {"max_cpc": max_cpc, "target_cpa": target_cpa, "target_roas": target_roas}
+    if bid_strategy_type is None:
+        set_knobs = [name for name, value in knobs.items() if value is not None]
+        if set_knobs:
+            raise ValueError(f"bid_strategy_type is required when setting {', '.join(set_knobs)}")
+        return None
+    key = bid_strategy_type.removesuffix("BiddingScheme") or bid_strategy_type
+    entry = _BIDDING_SCHEMES.get(key)
+    if entry is None:
+        raise ValueError(
+            "bid_strategy_type must be one of "
+            + ", ".join(_BIDDING_SCHEMES)
+            + f" (got {bid_strategy_type!r})"
+        )
+    cls, allowed = entry
+    for name, value in knobs.items():
+        if value is not None and name not in allowed:
+            raise ValueError(
+                f"{name} is not valid for bid_strategy_type {key!r} "
+                f"(accepts: {', '.join(allowed) or 'no parameters'})"
+            )
+    kwargs: dict[str, Any] = {}
+    if "max_cpc" in allowed and max_cpc is not None:
+        kwargs["max_cpc"] = Bid(amount=max_cpc)
+    if "target_cpa" in allowed and target_cpa is not None:
+        kwargs["target_cpa"] = target_cpa
+    if "target_roas" in allowed and target_roas is not None:
+        kwargs["target_roas"] = target_roas
+    return cls(**kwargs)
+
+
 def _custom_parameters(params: dict[str, str] | None) -> CustomParameters | None:
     """Wrap a plain ``{key: value}`` dict as the SDK's ``UrlCustomParameters``.
 
@@ -97,11 +169,18 @@ def create_campaign(
     name: str,
     daily_budget: float,
     description: str = "",
+    bid_strategy_type: str | None = None,
+    max_cpc: float | None = None,
+    target_cpa: float | None = None,
+    target_roas: float | None = None,
     tracking_url_template: str | None = None,
     final_url_suffix: str | None = None,
     url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
     """Create a paused Search campaign with a daily budget."""
+    bidding_scheme = _bidding_scheme(
+        bid_strategy_type, max_cpc=max_cpc, target_cpa=target_cpa, target_roas=target_roas
+    )
     campaign = Campaign(
         name=name,
         description=description or name,
@@ -111,6 +190,7 @@ def create_campaign(
         time_zone="EasternTimeUSCanada",
         campaign_type="Search",
         **_present(
+            bidding_scheme=bidding_scheme,
             tracking_url_template=tracking_url_template,
             final_url_suffix=final_url_suffix,
             url_custom_parameters=_custom_parameters(url_custom_parameters),
@@ -317,6 +397,10 @@ def update_campaign(
     daily_budget: float | None = None,
     status: str | None = None,
     bid_strategy_id: str | None = None,
+    bid_strategy_type: str | None = None,
+    max_cpc: float | None = None,
+    target_cpa: float | None = None,
+    target_roas: float | None = None,
     time_zone: str | None = None,
     tracking_url_template: str | None = None,
     final_url_suffix: str | None = None,
@@ -324,6 +408,14 @@ def update_campaign(
 ) -> MutationResult:
     """Update an existing campaign in place; only the fields you pass change."""
     _validate_status(status)
+    if bid_strategy_id is not None and bid_strategy_type is not None:
+        raise ValueError(
+            "set either bid_strategy_id (a portfolio strategy) or bid_strategy_type "
+            "(the campaign's own inline scheme), not both"
+        )
+    bidding_scheme = _bidding_scheme(
+        bid_strategy_type, max_cpc=max_cpc, target_cpa=target_cpa, target_roas=target_roas
+    )
     campaign = Campaign(
         id=campaign_id,
         **_present(
@@ -331,6 +423,7 @@ def update_campaign(
             daily_budget=daily_budget,
             status=status,
             bid_strategy_id=bid_strategy_id,
+            bidding_scheme=bidding_scheme,
             time_zone=time_zone,
             tracking_url_template=tracking_url_template,
             final_url_suffix=final_url_suffix,

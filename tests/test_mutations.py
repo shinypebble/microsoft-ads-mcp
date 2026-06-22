@@ -10,6 +10,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
+
 from microsoft_ads_mcp.domain.entities import AdSummary
 from microsoft_ads_mcp.services import mutations
 
@@ -56,6 +58,96 @@ def test_update_campaign_sends_only_changed_fields() -> None:
     _, method, request = client.calls[0]
     assert method == "update_campaigns"
     assert request.campaigns[0].to_dict() == {"Id": "1", "Name": "GCF_Search_Core_US"}
+
+
+def test_update_campaign_sets_inline_bid_strategy_max_clicks() -> None:
+    # The motivating case: switch to Maximize Clicks with a Maximum CPC limit. The scheme carries
+    # its own Type discriminator and the max_cpc is wrapped as a Bid(Amount).
+    client = _FakeClient()
+    result = mutations.update_campaign(
+        client, campaign_id="1", bid_strategy_type="MaxClicks", max_cpc=2.5
+    )
+    assert result.ok and result.ids == ["1"]
+    _, method, request = client.calls[0]
+    assert method == "update_campaigns"
+    assert request.campaigns[0].to_dict() == {
+        "Id": "1",
+        "BiddingScheme": {"Type": "MaxClicks", "MaxCpc": {"Amount": 2.5}},
+    }
+
+
+def test_update_campaign_inline_bid_strategy_without_params() -> None:
+    client = _FakeClient()
+    result = mutations.update_campaign(client, campaign_id="1", bid_strategy_type="EnhancedCpc")
+    assert result.ok
+    request = client.calls[0][2]
+    assert request.campaigns[0].to_dict() == {"Id": "1", "BiddingScheme": {"Type": "EnhancedCpc"}}
+
+
+def test_update_campaign_target_cpa_carries_target() -> None:
+    client = _FakeClient()
+    mutations.update_campaign(
+        client, campaign_id="1", bid_strategy_type="TargetCpa", target_cpa=25.0
+    )
+    request = client.calls[0][2]
+    assert request.campaigns[0].to_dict() == {
+        "Id": "1",
+        "BiddingScheme": {"Type": "TargetCpa", "TargetCpa": 25.0},
+    }
+
+
+def test_update_campaign_accepts_long_form_bid_strategy_type() -> None:
+    # get_campaigns reports the long "TargetRoasBiddingScheme" discriminator for TargetRoas; the
+    # write path normalizes it so a read value round-trips straight back.
+    client = _FakeClient()
+    mutations.update_campaign(
+        client, campaign_id="1", bid_strategy_type="TargetRoasBiddingScheme", target_roas=4.0
+    )
+    request = client.calls[0][2]
+    assert request.campaigns[0].to_dict() == {
+        "Id": "1",
+        "BiddingScheme": {"Type": "TargetRoasBiddingScheme", "TargetRoas": 4.0},
+    }
+
+
+def test_create_campaign_sets_inline_bid_strategy() -> None:
+    client = _FakeClient()
+    result = mutations.create_campaign(
+        client, name="New", daily_budget=10.0, bid_strategy_type="MaxClicks", max_cpc=1.0
+    )
+    assert (
+        result.ok is False
+    )  # _FakeClient returns no ids, so ok is False -- we only check the request
+    method, request = client.calls[0][1], client.calls[0][2]
+    assert method == "add_campaigns"
+    assert request.campaigns[0].bidding_scheme.to_dict() == {
+        "Type": "MaxClicks",
+        "MaxCpc": {"Amount": 1.0},
+    }
+
+
+def test_update_campaign_rejects_both_portfolio_and_inline_strategy() -> None:
+    with pytest.raises(ValueError, match="not both"):
+        mutations.update_campaign(
+            _FakeClient(), campaign_id="1", bid_strategy_id="55", bid_strategy_type="MaxClicks"
+        )
+
+
+def test_bid_strategy_knob_requires_a_type() -> None:
+    with pytest.raises(ValueError, match="bid_strategy_type is required"):
+        mutations.update_campaign(_FakeClient(), campaign_id="1", max_cpc=2.0)
+
+
+def test_bid_strategy_rejects_inapplicable_knob() -> None:
+    with pytest.raises(ValueError, match="target_cpa is not valid"):
+        mutations.update_campaign(
+            _FakeClient(), campaign_id="1", bid_strategy_type="MaxClicks", target_cpa=25.0
+        )
+
+
+def test_bid_strategy_rejects_unknown_type() -> None:
+    with pytest.raises(ValueError, match="bid_strategy_type must be one of"):
+        mutations.update_campaign(_FakeClient(), campaign_id="1", bid_strategy_type="Nonsense")
 
 
 def test_update_rsa_repoints_url_as_list_with_discriminator() -> None:
