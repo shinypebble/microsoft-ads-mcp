@@ -1,0 +1,79 @@
+src/microsoft_ads_mcp/services/mutations.py
+  s_fe174f8c1fa6e6::t_8ebaeab9666974 26,29-36,38-39
+  s_cf561d253c1a9d::t_71ce2b88f9e21d 128
+  s_fe174f8c1fa6e6::t_8fccd99b1acfc7 18
+  s_fe174f8c1fa6e6::t_f6ba3bc881f4cf 172-175,181-183,193
+  s_fe174f8c1fa6e6::t_8034db3b0e0111 119
+  s_fe174f8c1fa6e6::t_a4a261c83d59d6 400-403,411-418,426
+  s_fe174f8c1fa6e6::t_17faa1cecb5d86 95-117,123-127,129-154
+  s_fe174f8c1fa6e6::t_470dd0e3682ec3 118,120-122
+README.md
+  s_fe174f8c1fa6e6::t_36e64ad2da818f 124-125
+  s_fe174f8c1fa6e6::t_c665107447d3af 169-173
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_80c9feaffbffe6::t_0250ee4588f041 128-131
+  s_fe174f8c1fa6e6::t_7a08a5fcadfd67 108-110,123-127,132-133,155-158
+  s_80c9feaffbffe6::t_1ec151f23bb59c 107
+  s_fe174f8c1fa6e6::t_dd4362ec8b6cbf 134-139
+  s_80c9feaffbffe6::t_321ba733bc3026 43
+  s_fe174f8c1fa6e6::t_cdc0116ef1c1c1 44-46,57-63,76-79
+  s_80c9feaffbffe6::t_e91823cb0ca79a 13
+skill/microsoft-ads-optimizer/SKILL.md
+  s_fe174f8c1fa6e6::t_02e5f2128681f7 79-80
+  s_fe174f8c1fa6e6::t_f6d417ff231793 132-137
+tests/test_write_tool_schemas.py
+  s_80c9feaffbffe6::t_c68d83d717d066 1-68
+tests/test_mutations.py
+  s_fe174f8c1fa6e6::t_6bc77f6e8b3d30 137
+  s_fe174f8c1fa6e6::t_d603c29ff7d6ba 13-14
+  s_fe174f8c1fa6e6::t_97d324364d56d0 63-117,119,121-124,126-136,138-152
+src/microsoft_ads_mcp/server.py
+  s_fe174f8c1fa6e6::t_176b399e3532ef 63-66
+tests/test_url_tracking.py
+  s_fe174f8c1fa6e6::t_0a20c4a7ca47af 65-94
+src/microsoft_ads_mcp/domain/entities.py
+  s_80c9feaffbffe6::t_8d830c8559304a 63-64,70-80
+  s_fe174f8c1fa6e6::t_0d8c11bfe44d22 217-218
+  s_80c9feaffbffe6::t_429b40a8cd6de3 65-69
+  s_fe174f8c1fa6e6::t_79af8de4921ea1 220-224
+  s_fe174f8c1fa6e6::t_ce33f6a2ba649d 225-227
+  s_fe174f8c1fa6e6::t_52098c6a134680 46-62
+  s_fe174f8c1fa6e6::t_d11119ea983752 242,256-258
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "9449bb65c124449c83c96df2b002a0c9be9ec3f3",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_80c9feaffbffe6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "783d94ad-15d4-4d13-b27f-2a35ac2b9610",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    },
+    "s_cf561d253c1a9d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019eed25-ccc9-7631-a43a-b3815607decf",
+        "model": "gpt-5.5"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    },
+    "s_fe174f8c1fa6e6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fde8af4a-7259-4a08-b2c1-6a8b1843c46e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
