@@ -194,6 +194,8 @@ def test_conversion_goal_summary_surfaces_bidding_fields() -> None:
         }
     )
     summary = ConversionGoalSummary.from_sdk(goal)
+    # goal_type renders the friendly name, not the raw ConversionGoalType flag number.
+    assert summary.goal_type == "Url"
     assert summary.exclude_from_bidding is False
     assert summary.count_type == "Unique"
     assert summary.conversion_window_in_minutes == 43200

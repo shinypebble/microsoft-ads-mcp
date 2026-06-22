@@ -157,6 +157,8 @@ data — treat missing numbers as "unknown", not "zero".
   `goal_type="OfflineConversion"` (keyed by MSCLKID, no UET tag) or a UET-backed web goal
   (`Url`/`Event`/`Duration`/`PagesViewedPerVisit`, which require a `tag_id` from `get_uet_tags`).
   Goals are created **active** (a goal doesn't spend, and a paused goal silently fails to record).
+  Set a `goal_category` — it's required for `Event` and `OfflineConversion` goals. Note goals
+  **cannot be deleted** (no Microsoft API for it) — only paused or renamed, so name them carefully.
   `update_conversion_goal(goal_id, ...)` edits a goal in place — rename, set `status`
   ("Active"/"Paused"), and (the launch-relevant lever) toggle `exclude_from_bidding`: the inverse of
   the UI's "Include in conversions" checkbox and the single switch for whether a goal feeds

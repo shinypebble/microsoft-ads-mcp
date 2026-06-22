@@ -19,6 +19,9 @@ from openapi_client.models.campaign.add_conversion_goals_request import (
 from openapi_client.models.campaign.apply_offline_conversions_request import (
     ApplyOfflineConversionsRequest,
 )
+from openapi_client.models.campaign.conversion_goal_additional_field import (
+    ConversionGoalAdditionalField,
+)
 from openapi_client.models.campaign.conversion_goal_revenue import ConversionGoalRevenue
 from openapi_client.models.campaign.conversion_goal_type import ConversionGoalType
 from openapi_client.models.campaign.duration_goal import DurationGoal
@@ -73,6 +76,11 @@ _GOAL_SUBCLASSES = {
 # The web (UET-backed) goals require a UET TagId. OfflineConversion does not (keyed by MSCLKID).
 _WEB_GOAL_TYPES = frozenset({"Url", "Event", "Duration", "PagesViewedPerVisit"})
 
+# GoalCategory is an "additional field": the get-calls only return it when it's requested via
+# ReturnAdditionalFields, otherwise it comes back null even when set. Request it so the summary's
+# goal_category is populated.
+_GOAL_ADDITIONAL_FIELDS = ConversionGoalAdditionalField.GOALCATEGORY
+
 
 def get_conversion_goals(
     client: MsAdsClient, *, goal_ids: list[str] | None = None
@@ -87,7 +95,9 @@ def get_conversion_goals(
             CAMPAIGN,
             "get_conversion_goals_by_ids",
             GetConversionGoalsByIdsRequest(
-                conversion_goal_ids=goal_ids, conversion_goal_types=_GOAL_TYPES
+                conversion_goal_ids=goal_ids,
+                conversion_goal_types=_GOAL_TYPES,
+                return_additional_fields=_GOAL_ADDITIONAL_FIELDS,
             ),
         )
     else:
@@ -102,7 +112,11 @@ def get_conversion_goals(
         resp = client.call(
             CAMPAIGN,
             "get_conversion_goals_by_tag_ids",
-            GetConversionGoalsByTagIdsRequest(tag_ids=tag_ids, conversion_goal_types=_GOAL_TYPES),
+            GetConversionGoalsByTagIdsRequest(
+                tag_ids=tag_ids,
+                conversion_goal_types=_GOAL_TYPES,
+                return_additional_fields=_GOAL_ADDITIONAL_FIELDS,
+            ),
         )
     items = as_list(first_attr(resp, "ConversionGoals", "conversion_goals"))
     return [ConversionGoalSummary.from_sdk(g) for g in items if g is not None]

@@ -710,6 +710,9 @@ def register(mcp: FastMCP) -> None:
         """Create a conversion goal. Goals are created Active (a goal does not spend; a paused goal
         silently fails to record conversions) — pass status="Paused" to override.
 
+        Conversion goals CANNOT be deleted (Microsoft has no delete API) — they can only be paused
+        or renamed, so name them deliberately.
+
         Microsoft has no native "calls from ads" goal. The bid-eligible path for phone calls is an
         "OfflineConversion" goal fed by apply_offline_conversions (keyed by MSCLKID) — create that
         goal here, then upload qualifying calls with apply_offline_conversions.
@@ -727,7 +730,8 @@ def register(mcp: FastMCP) -> None:
             conversion_window_in_minutes: Click-to-conversion lookback in minutes (e.g. 43200 = 30
                 days).
             goal_category: Reporting category, e.g. "Purchase", "SubmitLeadForm", "Contact".
-                Required for "Event" goals (Microsoft rejects an Event goal with no category).
+                Required for "Event" and "OfflineConversion" goals (Microsoft rejects them with
+                InvalidGoalCategory if omitted); recommended for the others too.
             revenue_type: Value model — "FixedValue" (requires revenue_value), "VariableValue", or
                 "NoValue".
             revenue_value: Revenue amount (required for "FixedValue").
@@ -841,6 +845,9 @@ def register(mcp: FastMCP) -> None:
         calls >=60s), then upload one record per qualifying call. Each record is attributed to the
         click that drove it and counted under the goal whose name matches conversion_name. Returns
         per-record errors in partial_errors (the API returns no ids).
+
+        Note: wait ~2 hours after creating an OfflineConversion goal before uploading — earlier
+        uploads are rejected with "OfflineConversionNotAcceptedForGoal" (expected, not a bug).
 
         Args:
             conversions_to_apply: One or more conversions. Each has:

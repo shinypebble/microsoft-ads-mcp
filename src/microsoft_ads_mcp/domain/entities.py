@@ -480,7 +480,7 @@ class ConversionGoalSummary(BaseModel):
         return cls(
             id=str(_get(g, "Id", "id")),
             name=_get(g, "Name", "name"),
-            goal_type=_str_or_none(_get(g, "Type", "type")),
+            goal_type=_goal_type_name(_get(g, "Type", "type")),
             status=_str_or_none(_get(g, "Status", "status")),
             tag_id=_str_or_none(_get(g, "TagId", "tag_id")),
             tracking_status=_str_or_none(_get(g, "TrackingStatus", "tracking_status")),
@@ -903,6 +903,25 @@ def _str_or_none(val: Any) -> str | None:
     if val is None:
         return None
     return str(getattr(val, "value", val))
+
+
+def _goal_type_name(val: Any) -> str | None:
+    """Friendly conversion-goal type name (e.g. ``"Event"``, ``"OfflineConversion"``).
+
+    ``ConversionGoalType`` is an int ``Flag`` whose ``str()`` yields the API name, but its
+    ``.value`` is a bare number (16, 64) -- so ``_str_or_none`` would surface "16" instead of
+    "Event". Map through the enum so a raw int or its string form also resolves to the name.
+    """
+    if val is None:
+        return None
+    from openapi_client.models.campaign.conversion_goal_type import ConversionGoalType
+
+    if isinstance(val, ConversionGoalType):
+        return str(val)
+    try:
+        return str(ConversionGoalType(int(val)))
+    except ValueError, TypeError:
+        return str(val)
 
 
 def _blank_to_none(val: Any) -> str | None:
