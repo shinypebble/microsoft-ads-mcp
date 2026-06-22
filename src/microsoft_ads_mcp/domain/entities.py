@@ -28,6 +28,21 @@ IntentOption = Literal[
     # People in, searching for, or viewing pages about the targeted locations (Microsoft default).
     "PeopleInOrSearchingForOrViewingPages",
 ]
+# Ad distribution (the ad group's Network / "Ad distribution" setting): which Microsoft search
+# surfaces the ad group serves on. These are the two choices Microsoft's UI offers for Search ad
+# groups; spellings are used verbatim so they map straight onto the API. The SDK enum carries two
+# more values we deliberately do NOT offer for writes: "SyndicatedSearchOnly" -- Microsoft
+# consolidated it away and rejects it for Search ad groups (CampaignServiceInvalidNetwork, confirmed
+# live) -- and "InHousePromotion", an in-house-promotion mode that isn't advertiser ad distribution.
+# Reads may still return any of these since `get_ad_groups` returns a plain str, not this Literal.
+Network = Literal[
+    # "The entire Microsoft Advertising Network": Microsoft owned-and-operated sites PLUS all
+    # syndicated search partners (Microsoft's default).
+    "OwnedAndOperatedAndSyndicatedSearch",
+    # "Microsoft sites and select traffic": Microsoft sites plus a quality-screened partner subset
+    # (still some partner traffic, not pure owned-and-operated).
+    "OwnedAndOperatedOnly",
+]
 # Conversion-goal bidding / value knobs. Microsoft's enum spellings, used verbatim so they map
 # straight onto the API. (Goal status reuses CampaignStatus -- Active / Paused.)
 ConversionCountType = Literal["All", "Unique"]
@@ -207,6 +222,9 @@ class AdGroupSummary(BaseModel):
     name: str | None = None
     status: str | None = None
     cpc_bid: float | None = None
+    # Ad distribution (the SDK's Network): which Microsoft search surfaces this ad group serves on.
+    # A plain str (see the Network Literal) so legacy/in-house values pass through unchanged.
+    network: str | None = None
     # URL tracking. null means "not set here" (the campaign-level value, if any, applies).
     tracking_url_template: str | None = None
     final_url_suffix: str | None = None
@@ -221,6 +239,7 @@ class AdGroupSummary(BaseModel):
             name=_get(ag, "Name", "name"),
             status=_str_or_none(_get(ag, "Status", "status")),
             cpc_bid=amount,
+            network=_str_or_none(_get(ag, "Network", "network")),
             tracking_url_template=_get(ag, "TrackingUrlTemplate", "tracking_url_template"),
             final_url_suffix=_get(ag, "FinalUrlSuffix", "final_url_suffix"),
             url_custom_parameters=_custom_params(ag),

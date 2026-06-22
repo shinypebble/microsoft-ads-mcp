@@ -12,6 +12,7 @@ from typing import Any
 
 from microsoft_ads_mcp.domain.entities import (
     AccountUrlOptions,
+    AdGroupSummary,
     CampaignSummary,
     KeywordSummary,
 )
@@ -76,6 +77,26 @@ def test_keyword_summary_surfaces_final_url_and_blank_tracking() -> None:
     assert summary.final_url == "https://getconnectedfast.com/"
     assert summary.tracking_url_template is None
     assert summary.url_custom_parameters is None  # absent stays absent, not {}
+
+
+def test_ad_group_summary_surfaces_network() -> None:
+    # Ad distribution (the SDK's Network) is surfaced on the ad group read (issue 19).
+    ag = SimpleNamespace(
+        id=42,
+        name="AG",
+        status="Active",
+        cpc_bid=SimpleNamespace(amount=1.5),
+        network="OwnedAndOperatedOnly",
+    )
+    summary = AdGroupSummary.from_sdk(ag)
+    assert summary.network == "OwnedAndOperatedOnly"
+    assert summary.cpc_bid == 1.5
+
+
+def test_ad_group_summary_network_absent_stays_none() -> None:
+    # An ad group whose Network the API omits reads back as None, not a guessed default.
+    ag = SimpleNamespace(id=42, name="AG", status="Active", cpc_bid=None)
+    assert AdGroupSummary.from_sdk(ag).network is None
 
 
 # --------------------------------------------------------------------- hierarchy writes

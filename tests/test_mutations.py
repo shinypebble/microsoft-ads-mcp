@@ -217,3 +217,45 @@ def test_ad_summary_surfaces_rsa_copy() -> None:
     assert summary.descriptions == ["Compare plans now"]
     assert summary.path1 == "save"
     assert summary.final_url == "https://getconnectedfast.com/save/"
+
+
+def test_update_ad_group_sends_network() -> None:
+    """Partial update sends id + Network only, with the correct API alias (issue 19)."""
+    client = _FakeClient()
+    result = mutations.update_ad_group(
+        client, campaign_id="1", ad_group_id="7", network="OwnedAndOperatedOnly"
+    )
+    assert result.ok and result.ids == ["7"]
+    _, method, request = client.calls[0]
+    assert method == "update_ad_groups"
+    assert request.campaign_id == "1"
+    assert request.ad_groups[0].to_dict() == {"Id": "7", "Network": "OwnedAndOperatedOnly"}
+
+
+def test_create_ad_group_sends_network() -> None:
+    """A new (paused) ad group carries the requested ad distribution."""
+    client = _ConstClient(SimpleNamespace(ad_group_ids=["7"]))
+    result = mutations.create_ad_group(
+        client, campaign_id="1", name="AG", network="OwnedAndOperatedOnly"
+    )
+    assert result.ok and result.ids == ["7"]
+    ad_group = client.calls[0][2].ad_groups[0]
+    assert ad_group.network == "OwnedAndOperatedOnly"
+    assert ad_group.status == "Paused"  # new ad groups are created paused
+
+
+def test_update_ad_group_rejects_bad_network() -> None:
+    """Networks Microsoft rejects for Search ad groups are caught before any API call (iss. 19).
+
+    "SyndicatedSearchOnly" returns CampaignServiceInvalidNetwork live, and on create it would even
+    crash response parsing (null id) -- so we reject it (and "InHousePromotion") up front instead.
+    """
+    for bad in ("SyndicatedSearchOnly", "InHousePromotion"):
+        client = _FakeClient()
+        try:
+            mutations.update_ad_group(client, campaign_id="1", ad_group_id="7", network=bad)
+        except ValueError as exc:
+            assert "OwnedAndOperatedAndSyndicatedSearch" in str(exc)
+        else:  # pragma: no cover - the call must raise
+            raise AssertionError(f"expected ValueError for invalid network {bad!r}")
+        assert client.calls == []  # rejected before any API call

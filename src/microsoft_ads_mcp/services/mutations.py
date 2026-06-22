@@ -68,6 +68,18 @@ def _validate_status(status: str | None) -> None:
         raise ValueError("status must be 'Active' or 'Paused'")
 
 
+def _validate_network(network: str | None) -> None:
+    # Only the two networks Microsoft's UI offers for Search ad groups are settable;
+    # "SyndicatedSearchOnly" / "InHousePromotion" are rejected (CampaignServiceInvalidNetwork).
+    if network is not None and network not in (
+        "OwnedAndOperatedAndSyndicatedSearch",
+        "OwnedAndOperatedOnly",
+    ):
+        raise ValueError(
+            "network must be 'OwnedAndOperatedAndSyndicatedSearch' or 'OwnedAndOperatedOnly'"
+        )
+
+
 def _custom_parameters(params: dict[str, str] | None) -> CustomParameters | None:
     """Wrap a plain ``{key: value}`` dict as the SDK's ``UrlCustomParameters``.
 
@@ -161,6 +173,7 @@ def create_ad_group(
     name: str,
     cpc_bid: float = 1.0,
     language: str = "English",
+    network: str | None = None,
     tracking_url_template: str | None = None,
     final_url_suffix: str | None = None,
     url_custom_parameters: dict[str, str] | None = None,
@@ -170,12 +183,14 @@ def create_ad_group(
     ``language`` is required by Microsoft Advertising (error 1257
     ``CampaignServiceMissingLanguage`` otherwise); it defaults to English.
     """
+    _validate_network(network)
     ad_group = AdGroup(
         name=name,
         status="Paused",
         cpc_bid=Bid(amount=cpc_bid),
         language=language,
         **_present(
+            network=network,
             tracking_url_template=tracking_url_template,
             final_url_suffix=final_url_suffix,
             url_custom_parameters=_custom_parameters(url_custom_parameters),
@@ -344,15 +359,18 @@ def update_ad_group(
     name: str | None = None,
     status: str | None = None,
     cpc_bid: float | None = None,
+    network: str | None = None,
     tracking_url_template: str | None = None,
     final_url_suffix: str | None = None,
     url_custom_parameters: dict[str, str] | None = None,
 ) -> MutationResult:
     """Update an existing ad group in place (Microsoft requires the parent ``campaign_id``)."""
     _validate_status(status)
+    _validate_network(network)
     fields = _present(
         name=name,
         status=status,
+        network=network,
         tracking_url_template=tracking_url_template,
         final_url_suffix=final_url_suffix,
         url_custom_parameters=_custom_parameters(url_custom_parameters),

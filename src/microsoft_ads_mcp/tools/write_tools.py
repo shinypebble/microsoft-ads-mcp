@@ -17,6 +17,7 @@ from ..domain.entities import (
     MatchType,
     MutationResult,
     NegativeEntityType,
+    Network,
 )
 from ..services import (
     account_properties,
@@ -128,6 +129,7 @@ def register(mcp: FastMCP) -> None:
         name: str,
         cpc_bid: float = 1.0,
         language: str = "English",
+        network: Network | None = None,
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
         url_custom_parameters: dict[str, str] | None = None,
@@ -139,6 +141,10 @@ def register(mcp: FastMCP) -> None:
             name: Ad group name.
             cpc_bid: Default CPC bid in account currency (default 1.0).
             language: Ad group language (required by Microsoft; default "English").
+            network: Ad distribution (where the ad group serves). Omit to inherit Microsoft's
+                default. "OwnedAndOperatedAndSyndicatedSearch" = the entire Microsoft Advertising
+                Network (Microsoft sites + all syndicated partners); "OwnedAndOperatedOnly" =
+                Microsoft sites and select traffic (a quality-screened partner subset).
             tracking_url_template: Optional tracking template for URLs in the ad group.
             final_url_suffix: Optional Final URL suffix appended to landing-page URLs.
             url_custom_parameters: Optional {key: value} URL custom parameters, referenced in
@@ -151,6 +157,7 @@ def register(mcp: FastMCP) -> None:
                 name=name,
                 cpc_bid=cpc_bid,
                 language=language,
+                network=network,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,
                 url_custom_parameters=url_custom_parameters,
@@ -164,6 +171,7 @@ def register(mcp: FastMCP) -> None:
         name: str | None = None,
         status: CampaignStatus | None = None,
         cpc_bid: float | None = None,
+        network: Network | None = None,
         tracking_url_template: str | None = None,
         final_url_suffix: str | None = None,
         url_custom_parameters: dict[str, str] | None = None,
@@ -176,6 +184,10 @@ def register(mcp: FastMCP) -> None:
             name: New ad group name (rename).
             status: "Active" or "Paused".
             cpc_bid: New default CPC bid in account currency.
+            network: Ad distribution (where the ad group serves).
+                "OwnedAndOperatedAndSyndicatedSearch" = the entire Microsoft Advertising Network;
+                "OwnedAndOperatedOnly" = Microsoft sites and select traffic (a quality-screened
+                partner subset). Read the current value from get_ad_groups.
             tracking_url_template: Tracking template for URLs in the ad group.
             final_url_suffix: Final URL suffix appended to landing-page URLs.
             url_custom_parameters: {key: value} URL custom parameters, referenced in
@@ -189,6 +201,7 @@ def register(mcp: FastMCP) -> None:
                 name=name,
                 status=status,
                 cpc_bid=cpc_bid,
+                network=network,
                 tracking_url_template=tracking_url_template,
                 final_url_suffix=final_url_suffix,
                 url_custom_parameters=url_custom_parameters,

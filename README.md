@@ -122,7 +122,9 @@ campaign time zone they run in), `get_device_bid_adjustments` (per-device modifi
 Computers / Smartphones / Tablets), `resolve_postal_codes`
 (ZIP → Microsoft LocationId), `bulk_download`, `get_account_url_options`. `get_campaigns` also
 surfaces each campaign's `time_zone`, `start_date`, `languages`, `bid_strategy_type`, and
-`ad_schedule_use_searcher_time_zone`. The hierarchy reads
+`ad_schedule_use_searcher_time_zone`. `get_ad_groups` surfaces each ad group's `network` (ad
+distribution: the entire Microsoft Advertising Network vs. Microsoft sites and select traffic only).
+The hierarchy reads
 (`get_campaigns`, `get_ad_groups`, `get_ads`, `get_keywords`) also surface each entity's URL
 tracking — `tracking_url_template`, `final_url_suffix`, and `url_custom_parameters`. A `null`
 template at a level usually means it inherits the **account-level** default, which
@@ -162,6 +164,7 @@ and `shortfall`. Every value is a modeled estimate and may be `null` where Micro
   `delete_ad_group`, `delete_ad`, `delete_keyword`. Create/update at every level (campaign, ad
   group, ad, keyword) accept `tracking_url_template`, `final_url_suffix`, and
   `url_custom_parameters` (a `{key: value}` map, referenced in templates as `{_key}`).
+  `create_ad_group` / `update_ad_group` also accept `network` (ad distribution).
 - *Account-level URL options* — `set_account_url_options` sets the tracking template, Final URL
   suffix, and `msclkid` auto-tagging once for the whole account (every campaign inherits them) —
   the cleanest single-point lever for an account-wide tracking/rebrand change.
