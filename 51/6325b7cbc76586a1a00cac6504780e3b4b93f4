@@ -1,0 +1,49 @@
+src/microsoft_ads_mcp/domain/entities.py
+  s_7b5839c57a63ed::t_0d9800a6d4f6b1 242
+  s_7b5839c57a63ed::t_c2134eedb97bb1 31,38,41,44-45
+  s_7b5839c57a63ed::t_17fbb7cd1e6766 225-227
+  s_7b5839c57a63ed::t_d99aaee692bc16 32-37,39-40,42-43
+tests/test_mutations.py
+  s_7b5839c57a63ed::t_256d6a933e2e47 223
+  s_7b5839c57a63ed::t_11fe45d78d0e63 220-222,224-238,240-242,244-247
+  s_7b5839c57a63ed::t_192f12688b2864 239,243,248-261
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_7b5839c57a63ed::t_8c99bf1b21d393 146-147
+  s_7b5839c57a63ed::t_472842516d4ebe 174,204
+  s_7b5839c57a63ed::t_4d19d569d3018e 189-190
+  s_7b5839c57a63ed::t_cb76773f1ad866 132,144-145,160
+  s_7b5839c57a63ed::t_ea20981cb1bcdb 187-188
+  s_7b5839c57a63ed::t_1a1d7c595c59ee 20
+tests/test_url_tracking.py
+  s_7b5839c57a63ed::t_ef8a0cf6ef29ba 82-101
+  s_7b5839c57a63ed::t_aca828598bfff8 15
+README.md
+  s_7b5839c57a63ed::t_5e2155718e5b20 167
+  s_7b5839c57a63ed::t_b36bd3105b02ca 125-127
+src/microsoft_ads_mcp/services/mutations.py
+  s_7b5839c57a63ed::t_7e62650dbca458 72-73,79
+  s_7b5839c57a63ed::t_4d9d96c96f5349 362,369,373
+  s_7b5839c57a63ed::t_c5900c0b681de6 176,186,193
+  s_7b5839c57a63ed::t_4da5b71f12c8c6 71,74-78,80-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "516325b7cbc76586a1a00cac6504780e3b4b93f4",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_7b5839c57a63ed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "113363a0-b713-4557-8ceb-1dca63807ab0",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
