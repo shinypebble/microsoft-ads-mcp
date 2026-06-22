@@ -35,6 +35,10 @@ class _FakeClient:
         self.calls.append((service, method, request))
         return _Resp()
 
+    # create_*/add_* paths read the raw JSON via call_raw; first_attr is dict-or-object tolerant.
+    def call_raw(self, service: str, method: str, request: Any) -> _Resp:
+        return self.call(service, method, request)
+
 
 def _custom_params_obj(**pairs: str) -> SimpleNamespace:
     """Mimic an SDK ``UrlCustomParameters`` (Parameters -> list of Key/Value)."""

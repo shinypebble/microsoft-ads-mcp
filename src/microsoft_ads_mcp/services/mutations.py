@@ -196,7 +196,9 @@ def create_campaign(
             url_custom_parameters=_custom_parameters(url_custom_parameters),
         ),
     )
-    resp = client.call(
+    # call_raw: a rejected campaign returns CampaignIds=[null] + PartialErrors, which the typed
+    # model can't parse (its id list is non-nullable strings); the raw dict surfaces it.
+    resp = client.call_raw(
         CAMPAIGN,
         "add_campaigns",
         AddCampaignsRequest(account_id=client.account_id, campaigns=[campaign]),
@@ -276,7 +278,9 @@ def create_ad_group(
             url_custom_parameters=_custom_parameters(url_custom_parameters),
         ),
     )
-    resp = client.call(
+    # call_raw: a rejected ad group returns AdGroupIds=[null] + PartialErrors, which the typed
+    # model can't parse (its id list is non-nullable strings); the raw dict surfaces it.
+    resp = client.call_raw(
         CAMPAIGN,
         "add_ad_groups",
         AddAdGroupsRequest(
@@ -325,7 +329,10 @@ def add_keywords(
         )
         for text in keywords
     ]
-    resp = client.call(
+    # call_raw: a rejected keyword (e.g. a duplicate) returns KeywordIds=[null] + PartialErrors,
+    # which the typed model can't parse (its id list is non-nullable strings); the raw dict
+    # surfaces the reason instead of crashing.
+    resp = client.call_raw(
         CAMPAIGN,
         "add_keywords",
         AddKeywordsRequest(ad_group_id=ad_group_id, keywords=kw_models),
@@ -334,7 +341,11 @@ def add_keywords(
     errors = _partial_errors(resp)
     return MutationResult(
         ok=bool(ids),
-        message=f"Added {len(ids)} keyword(s) to ad group {ad_group_id}",
+        message=(
+            f"Added {len(ids)} keyword(s) to ad group {ad_group_id}"
+            if ids
+            else "Add keywords failed"
+        ),
         ids=ids,
         partial_errors=errors,
     )
@@ -373,7 +384,9 @@ def create_responsive_search_ad(
         ad.Path1 = path1[:15]
     if path2:
         ad.Path2 = path2[:15]
-    resp = client.call(CAMPAIGN, "add_ads", AddAdsRequest(ad_group_id=ad_group_id, ads=[ad]))
+    # call_raw: a rejected ad returns AdIds=[null] + PartialErrors, which the typed model can't
+    # parse (its id list is non-nullable strings); the raw dict surfaces the reason.
+    resp = client.call_raw(CAMPAIGN, "add_ads", AddAdsRequest(ad_group_id=ad_group_id, ads=[ad]))
     ids = _ids(resp, "AdIds", "ad_ids")
     errors = _partial_errors(resp)
     return MutationResult(

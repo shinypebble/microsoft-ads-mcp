@@ -141,7 +141,9 @@ def add_location_targets(
                     criterion_bid=criterion_bid,
                 )
             )
-    resp = client.call(
+    # call_raw: a rejected criterion returns CampaignCriterionIds=[null] + PartialErrors, which the
+    # typed model can't parse (its id list is non-nullable strings); the raw dict surfaces it.
+    resp = client.call_raw(
         CAMPAIGN,
         "add_campaign_criterions",
         # Adds go under the umbrella "Targets" type; the specific "Location" type is only valid
@@ -243,7 +245,9 @@ def set_location_intent(
     cc = BiddableCampaignCriterion(
         type="BiddableCampaignCriterion", campaign_id=campaign_id, criterion=criterion
     )
-    resp = client.call(
+    # call_raw: a rejected criterion returns CampaignCriterionIds=[null] + PartialErrors, which the
+    # typed model can't parse (its id list is non-nullable strings); the raw dict surfaces it.
+    resp = client.call_raw(
         CAMPAIGN,
         "add_campaign_criterions",
         AddCampaignCriterionsRequest(
@@ -351,7 +355,10 @@ def add_ad_schedules(
                 criterion_bid=criterion_bid,
             )
         )
-    resp = client.call(
+    # call_raw: a rejected window (e.g. one overlapping an existing same-day window) returns
+    # CampaignCriterionIds=[null] + PartialErrors, which the typed model can't parse (its id list
+    # is non-nullable strings); the raw dict lets the reason surface instead of crashing.
+    resp = client.call_raw(
         CAMPAIGN,
         "add_campaign_criterions",
         # Adds go under the umbrella "Targets" type; the specific "DayTime" type is only valid for
@@ -433,6 +440,48 @@ def remove_ad_schedules(
         ids=[str(i) for i in criterion_ids],
         partial_errors=errors,
     )
+
+
+def replace_ad_schedule(
+    client: MsAdsClient,
+    *,
+    campaign_id: str,
+    criterion_id: str,
+    new_window: AdScheduleInput,
+    use_searcher_time_zone: bool | None = None,
+) -> MutationResult:
+    """Replace one dayparting window: remove the old criterion, then add the new window.
+
+    The API rejects adding a window that overlaps an existing same-day window, so the only safe
+    order is remove-then-add (briefly leaving that window uncovered). If the remove fails nothing
+    is changed; if the add fails *after* a successful remove, the result says so clearly -- the old
+    window is already gone, so the caller knows coverage is currently dropped and can re-add.
+    """
+    removed = remove_ad_schedules(client, campaign_id=campaign_id, criterion_ids=[criterion_id])
+    if not removed.ok:
+        return removed
+    added = add_ad_schedules(
+        client,
+        campaign_id=campaign_id,
+        schedules=[new_window],
+        use_searcher_time_zone=use_searcher_time_zone,
+    )
+    if not added.ids:
+        # No id came back -> the new window was rejected (e.g. it overlaps another existing window).
+        # The old window is already gone, so that slot is now uncovered; tell the caller to re-add.
+        return MutationResult(
+            ok=False,
+            message=(
+                f"Removed old ad-schedule window {criterion_id} but adding the new window failed "
+                f"-- campaign {campaign_id} now has no window where the old one was; re-add it"
+            ),
+            ids=[],
+            partial_errors=added.partial_errors,
+        )
+    # The new window landed (added.ids is non-empty). Pass add_ad_schedules' result through as-is:
+    # ok=True on full success, or its own ok=False + the real id when only the optional time-zone
+    # flag update failed -- never the misleading "re-add" message (the window already exists).
+    return added
 
 
 def get_device_bid_adjustments(
@@ -527,7 +576,9 @@ def set_device_bid_adjustment(
         for name in _ALL_DEVICES
         if name not in existing
     ]
-    resp = client.call(
+    # call_raw: a rejected criterion returns CampaignCriterionIds=[null] + PartialErrors, which the
+    # typed model can't parse (its id list is non-nullable strings); the raw dict surfaces it.
+    resp = client.call_raw(
         CAMPAIGN,
         "add_campaign_criterions",
         AddCampaignCriterionsRequest(

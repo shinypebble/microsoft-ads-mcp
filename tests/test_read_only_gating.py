@@ -34,6 +34,9 @@ WRITE_TOOLS = {
     "update_uet_tag",
     "add_location_targets",
     "remove_location_targets",
+    "add_ad_schedules",
+    "remove_ad_schedules",
+    "replace_ad_schedule",
     "bulk_upload",
     "set_account_url_options",
 }

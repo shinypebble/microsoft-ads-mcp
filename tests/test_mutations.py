@@ -32,6 +32,10 @@ class _FakeClient:
         self.calls.append((service, method, request))
         return _Resp()
 
+    # create_*/add_* paths read the raw JSON via call_raw; first_attr is dict-or-object tolerant.
+    def call_raw(self, service: str, method: str, request: Any) -> _Resp:
+        return self.call(service, method, request)
+
 
 class _ConstClient:
     """Returns one fixed response for every call (for inspecting partial-error handling)."""
@@ -45,6 +49,9 @@ class _ConstClient:
     def call(self, service: str, method: str, request: Any) -> Any:
         self.calls.append((service, method, request))
         return self._resp
+
+    def call_raw(self, service: str, method: str, request: Any) -> Any:
+        return self.call(service, method, request)
 
 
 def _batch_error(code: str, message: str = "") -> Any:
@@ -351,3 +358,29 @@ def test_update_ad_group_rejects_bad_network() -> None:
         else:  # pragma: no cover - the call must raise
             raise AssertionError(f"expected ValueError for invalid network {bad!r}")
         assert client.calls == []  # rejected before any API call
+
+
+def test_add_keywords_null_id_surfaces_partial_error() -> None:
+    # The original issue-9 repro: a duplicate keyword comes back as KeywordIds=[null] +
+    # PartialErrors. call_raw + dict-aware helpers must surface the reason as ok=false, not crash on
+    # the non-nullable id list. Script the raw JSON dict (Pascal keys) call_raw really returns.
+    raw = {
+        "KeywordIds": [None],
+        "PartialErrors": [{"Code": "CampaignServiceDuplicateKeyword", "Message": "dup"}],
+    }
+    result = mutations.add_keywords(_ConstClient(raw), ad_group_id="7", keywords=["astound login"])
+    assert result.ok is False and result.ids == []
+    assert result.message == "Add keywords failed"
+    assert result.partial_errors == ["CampaignServiceDuplicateKeyword: dup"]
+
+
+def test_create_ad_group_null_id_surfaces_partial_error() -> None:
+    # A rejected ad group returns AdGroupIds=[null] + PartialErrors; must degrade, not crash.
+    raw = {
+        "AdGroupIds": [None],
+        "PartialErrors": [{"Code": "CampaignServiceInvalidNetwork", "Message": "bad network"}],
+    }
+    result = mutations.create_ad_group(_ConstClient(raw), campaign_id="1", name="AG")
+    assert result.ok is False and result.ids == []
+    assert result.message == "Ad group create failed"
+    assert result.partial_errors == ["CampaignServiceInvalidNetwork: bad network"]

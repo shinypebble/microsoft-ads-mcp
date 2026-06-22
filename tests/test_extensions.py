@@ -23,6 +23,11 @@ class _ScriptedClient:
         self.calls.append((service, method, request))
         return self._responses.pop(0)
 
+    # add_ad_extensions reads the raw JSON via call_raw; first_attr is dict-or-object tolerant, so
+    # pull from the same queue.
+    def call_raw(self, service: str, method: str, request: Any) -> Any:
+        return self.call(service, method, request)
+
 
 def test_type_filter_resolves_friendly_names() -> None:
     f = extensions._type_filter(["Call", "Sitelink"])
@@ -57,6 +62,30 @@ def test_get_ad_extensions_two_step_and_maps() -> None:
         "get_ad_extensions_by_ids",
     ]
     assert out[0].id == "55" and out[0].phone_number == "2065551212"
+
+
+def test_get_ad_extensions_surfaces_is_call_only() -> None:
+    # Issue 8: the call-only flag (the UI's "Show just my phone number") must be readable, not just
+    # settable, so the configured call-only state can be confirmed via MCP.
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(ad_extension_ids=["8246425032469"]),
+            SimpleNamespace(
+                ad_extensions=[
+                    SimpleNamespace(
+                        id="8246425032469",
+                        type="CallAdExtension",
+                        status="Active",
+                        phone_number="8555665900",
+                        country_code="US",
+                        is_call_only=True,
+                    )
+                ]
+            ),
+        ]
+    )
+    out = extensions.get_ad_extensions(client, association_type="Account")
+    assert out[0].is_call_only is True
 
 
 def test_get_ad_extensions_short_circuits_when_empty() -> None:
@@ -224,3 +253,23 @@ def test_add_callout_creates_then_associates() -> None:
     ]
     assoc = client.calls[1][2].ad_extension_id_to_entity_id_associations[0]
     assert assoc.ad_extension_id == "99" and assoc.entity_id == "487928625"
+
+
+def test_add_call_extension_null_id_surfaces_partial_error() -> None:
+    # A rejected extension comes back with a null identity Id + NestedPartialErrors; call_raw +
+    # dict-aware first_attr must surface it as ok=false, not crash on the non-nullable id. Script
+    # the raw JSON dict (Pascal keys) that call_raw really returns, and assert no association is
+    # attempted once the create failed.
+    raw = {
+        "AdExtensionIdentities": [{"Id": None}],
+        "NestedPartialErrors": [
+            {"BatchErrors": [{"Code": "CallOnlyPhoneNumberInvalid", "Message": "bad number"}]}
+        ],
+    }
+    client = _ScriptedClient([raw])
+    result = extensions.add_call_extension(
+        client, phone_number="000", country_code="US", entity_id="487928625"
+    )
+    assert result.ok is False and result.ids == []
+    assert result.partial_errors == ["CallOnlyPhoneNumberInvalid: bad number"]
+    assert [c[1] for c in client.calls] == ["add_ad_extensions"]

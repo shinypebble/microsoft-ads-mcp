@@ -434,6 +434,9 @@ class AdExtensionSummary(BaseModel):
     # Whether Microsoft call tracking is on (the number shown is a forwarding number, so call
     # conversions are measured). null for non-call extensions.
     is_call_tracking_enabled: bool | None = None
+    # Whether the extension shows only the phone number (the UI's "Show just my phone number" /
+    # call-only mobile format). null for non-call extensions.
+    is_call_only: bool | None = None
     # Callout / structured snippet
     text: str | None = None
     # Sitelink
@@ -449,6 +452,7 @@ class AdExtensionSummary(BaseModel):
             phone_number=_get(ext, "PhoneNumber", "phone_number"),
             country_code=_get(ext, "CountryCode", "country_code"),
             is_call_tracking_enabled=_get(ext, "IsCallTrackingEnabled", "is_call_tracking_enabled"),
+            is_call_only=_get(ext, "IsCallOnly", "is_call_only"),
             text=_get(ext, "Text", "text"),
             display_text=_get(ext, "DisplayText", "display_text"),
             final_url=_first_final_url(ext),

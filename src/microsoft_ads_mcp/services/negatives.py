@@ -64,7 +64,10 @@ def add_negative_keywords(
     entity = EntityNegativeKeyword(
         entity_id=entity_id, entity_type=entity_type, negative_keywords=nks
     )
-    resp = client.call(
+    # call_raw: a rejected negative returns a null id (with the reason in NestedPartialErrors),
+    # which the typed nested-id model can't parse (its ids are non-nullable strings); the raw dict
+    # surfaces it instead of crashing.
+    resp = client.call_raw(
         CAMPAIGN,
         "add_negative_keywords_to_entities",
         AddNegativeKeywordsToEntitiesRequest(entity_negative_keywords=[entity]),

@@ -181,7 +181,9 @@ and `shortfall`. Every value is a modeled estimate and may be `null` where Micro
   `is_call_tracking_enabled` (US/UK) to turn on Microsoft call tracking so call-from-ad
   conversions are measured — pass it on `add_call_extension`, or flip it on an existing asset
   with `update_call_extension`. New forwarding numbers are local (toll-free is no longer
-  provisioned). `get_ad_extensions` surfaces the current `is_call_tracking_enabled` flag.
+  provisioned). They also accept `is_call_only` (the "Show just my phone number" call-only mobile
+  format). `get_ad_extensions` surfaces the current `is_call_tracking_enabled` and `is_call_only`
+  flags.
 - *Conversion goals / UET tags* — `create_conversion_goal` adds a goal: an `OfflineConversion`
   goal (keyed by MSCLKID, no UET tag) or a UET-backed web goal (`Url` / `Event` / `Duration` /
   `PagesViewedPerVisit`, which need a `tag_id`). Goals are created **active** (a goal doesn't spend;
@@ -197,9 +199,12 @@ and `shortfall`. Every value is a modeled estimate and may be `null` where Micro
 - *Location (ZIP/geo) targeting* — `add_location_targets`, `remove_location_targets`,
   `set_location_intent` (presence — `PeopleIn` — vs. search-interest targeting; one criterion
   per campaign, updated in place).
-- *Ad scheduling (dayparting)* — `add_ad_schedules`, `remove_ad_schedules` (day + time windows at
-  15-minute granularity; times run in the campaign time zone unless `use_searcher_time_zone` is
-  set). `update_campaign` accepts `time_zone` to set the zone those schedules run in.
+- *Ad scheduling (dayparting)* — `add_ad_schedules`, `remove_ad_schedules`, `replace_ad_schedule`
+  (day + time windows at 15-minute granularity; times run in the campaign time zone unless
+  `use_searcher_time_zone` is set). Windows are additive, but a same-day window may **not** overlap
+  an existing one (the API rejects it), so to change or extend a window use `replace_ad_schedule`
+  (which removes the old criterion then adds the new one — the only safe order) rather than adding
+  over it. `update_campaign` accepts `time_zone` to set the zone those schedules run in.
 - *Device bid adjustments* — `set_device_bid_adjustment(campaign_id, device, bid_adjustment)` sets
   a per-device modifier (-100 to 900 percent; -100 excludes the device). Microsoft calls mobile
   **Smartphones** (there is no "Mobile"); "Computers" is desktop/laptop. Device criterions are

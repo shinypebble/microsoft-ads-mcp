@@ -47,6 +47,11 @@ class _FakeClient:
         self.calls.append((service, method, request))
         return self._resp
 
+    # Add* paths read the raw JSON via call_raw; the dict-or-object-tolerant first_attr reads the
+    # scripted response the same either way, so delegate to the same fixed response.
+    def call_raw(self, service: str, method: str, request: Any) -> Any:
+        return self.call(service, method, request)
+
 
 def test_add_location_targets_builds_biddable_criterion_with_discriminators() -> None:
     resp = SimpleNamespace(campaign_criterion_ids=["900"], nested_partial_errors=[])
@@ -93,6 +98,11 @@ class _SequencedClient:
     def call(self, service: str, method: str, request: Any) -> Any:
         self.calls.append((service, method, request))
         return self._responses.pop(0)
+
+    # Add* paths read the raw JSON via call_raw; first_attr reads the queued response the same
+    # whether it is a dict or an object, so pull from the same queue.
+    def call_raw(self, service: str, method: str, request: Any) -> Any:
+        return self.call(service, method, request)
 
 
 def _intent_criterion(intent: str) -> Any:
@@ -299,6 +309,138 @@ def test_remove_ad_schedules_passes_targets_type() -> None:
     request = client.calls[0][2]
     assert request.criterion_type.name == "TARGETS"
     assert request.campaign_criterion_ids == ["901", "902"]
+
+
+def test_add_ad_schedules_null_id_surfaces_partial_error() -> None:
+    # Microsoft returns HTTP 200 with CampaignCriterionIds=[null] + NestedPartialErrors when a
+    # window is rejected (e.g. it overlaps an existing same-day window). call_raw + dict-aware
+    # first_attr must surface the reason cleanly, not crash on the non-nullable id list. Script the
+    # raw JSON dict (Pascal keys) that call_raw really returns.
+    raw = {
+        "CampaignCriterionIds": [None],
+        "NestedPartialErrors": [
+            {
+                "BatchErrors": [
+                    {
+                        "Code": "CampaignServiceAdScheduleOverlaps",
+                        "Message": "overlaps an existing schedule",
+                    }
+                ]
+            }
+        ],
+    }
+    client = _FakeClient(raw)
+    result = criteria.add_ad_schedules(
+        client,
+        campaign_id="1",
+        schedules=[
+            AdScheduleInput(day="Monday", from_hour=9, from_minute=15, to_hour=19, to_minute=45)
+        ],
+    )
+    assert result.ok is False
+    assert result.ids == []
+    assert result.partial_errors == [
+        "CampaignServiceAdScheduleOverlaps: overlaps an existing schedule"
+    ]
+
+
+def test_add_location_targets_null_id_surfaces_partial_error() -> None:
+    # Same rejected-criterion shape for location targets: a null id must degrade to a partial error.
+    raw = {
+        "CampaignCriterionIds": [None],
+        "NestedPartialErrors": [
+            {"BatchErrors": [{"Code": "DuplicateInRequest", "Message": "dup"}]}
+        ],
+    }
+    client = _FakeClient(raw)
+    result = criteria.add_location_targets(client, campaign_id="1", location_ids=["111"])
+    assert result.ok is False and result.ids == []
+    assert result.partial_errors == ["DuplicateInRequest: dup"]
+
+
+def test_replace_ad_schedule_removes_then_adds() -> None:
+    remove_resp = SimpleNamespace(partial_errors=[])
+    add_resp = SimpleNamespace(campaign_criterion_ids=["55"], nested_partial_errors=[])
+    client = _SequencedClient(remove_resp, add_resp)
+    new_window = AdScheduleInput(
+        day="Monday", from_hour=9, from_minute=15, to_hour=19, to_minute=45
+    )
+    result = criteria.replace_ad_schedule(
+        client, campaign_id="1", criterion_id="901", new_window=new_window
+    )
+    assert result.ok and result.ids == ["55"]
+    # The remove must precede the add -- adding the overlapping window first is rejected by the API.
+    assert client.calls[0][1] == "delete_campaign_criterions"
+    assert client.calls[0][2].campaign_criterion_ids == ["901"]
+    assert client.calls[1][1] == "add_campaign_criterions"
+    cc = client.calls[1][2].campaign_criterions[0]
+    assert cc.criterion.day.value == "Monday" and cc.criterion.from_hour == 9
+
+
+def test_replace_ad_schedule_remove_failure_short_circuits() -> None:
+    # If the remove fails, nothing is destroyed and the add is never attempted.
+    remove_resp = SimpleNamespace(partial_errors=[SimpleNamespace(code="X", message="nope")])
+    client = _SequencedClient(remove_resp)
+    new_window = AdScheduleInput(day="Monday", from_hour=9, to_hour=19)
+    result = criteria.replace_ad_schedule(
+        client, campaign_id="1", criterion_id="901", new_window=new_window
+    )
+    assert not result.ok
+    assert [c[1] for c in client.calls] == ["delete_campaign_criterions"]
+
+
+def test_replace_ad_schedule_add_failure_after_remove_reports_gap() -> None:
+    # Remove succeeds but the new window is rejected -> the old window is already gone; the result
+    # must say so (so the caller knows coverage is dropped) and surface the add's partial errors.
+    remove_resp = SimpleNamespace(partial_errors=[])
+    add_resp = SimpleNamespace(
+        campaign_criterion_ids=[None],
+        nested_partial_errors=[
+            SimpleNamespace(
+                batch_errors=[SimpleNamespace(code="AdScheduleOverlaps", message="overlaps")]
+            )
+        ],
+    )
+    client = _SequencedClient(remove_resp, add_resp)
+    new_window = AdScheduleInput(day="Monday", from_hour=9, to_hour=19)
+    result = criteria.replace_ad_schedule(
+        client, campaign_id="1", criterion_id="901", new_window=new_window
+    )
+    assert result.ok is False and result.ids == []
+    assert "removed" in result.message.lower() and "re-add" in result.message.lower()
+    assert any("overlaps" in e.lower() for e in result.partial_errors)
+    assert [c[1] for c in client.calls] == [
+        "delete_campaign_criterions",
+        "add_campaign_criterions",
+    ]
+
+
+def test_replace_ad_schedule_tz_flag_failure_keeps_added_window() -> None:
+    # The new window IS added but the optional time-zone-flag update fails -> add_ad_schedules
+    # returns ok=False yet carries the real id. replace must NOT report this as "re-add it" (the
+    # window exists); it passes the accurate result through with the new id intact.
+    remove_resp = SimpleNamespace(partial_errors=[])
+    add_resp = SimpleNamespace(campaign_criterion_ids=["55"], nested_partial_errors=[])
+    tz_resp = SimpleNamespace(partial_errors=[SimpleNamespace(code="TzBad", message="tz failed")])
+    client = _SequencedClient(remove_resp, add_resp, tz_resp)
+    new_window = AdScheduleInput(day="Monday", from_hour=9, to_hour=19)
+    result = criteria.replace_ad_schedule(
+        client,
+        campaign_id="1",
+        criterion_id="901",
+        new_window=new_window,
+        use_searcher_time_zone=True,
+    )
+    assert result.ok is False
+    assert result.ids == ["55"]  # the added window's id is preserved, not dropped
+    assert "re-add" not in result.message.lower()  # not the false "window missing" message
+    assert "time-zone" in result.message.lower()
+    assert any("tz failed" in e.lower() for e in result.partial_errors)
+    assert [c[1] for c in client.calls] == [
+        "delete_campaign_criterions",
+        "add_campaign_criterions",
+        "update_campaigns",
+    ]
 
 
 def _device_criterion(criterion_id: str, device: str, multiplier: float = 0.0) -> Any:

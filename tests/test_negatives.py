@@ -21,6 +21,11 @@ class _FakeClient:
         self.calls.append((service, method, request))
         return self._resp
 
+    # add_negative_keywords_to_entities reads the raw JSON via call_raw; first_attr is
+    # dict-or-object tolerant, so delegate to the same fixed response.
+    def call_raw(self, service: str, method: str, request: Any) -> Any:
+        return self.call(service, method, request)
+
 
 def test_add_negatives_builds_entity_graph_and_flattens_ids() -> None:
     resp = SimpleNamespace(
@@ -88,3 +93,21 @@ def test_invalid_entity_type_rejected() -> None:
         negatives.add_negative_keywords(
             client, entity_id="1", entity_type="Account", keywords=["x"]
         )
+
+
+def test_add_negatives_null_id_surfaces_partial_error() -> None:
+    # A rejected negative comes back with a null nested id + NestedPartialErrors; call_raw +
+    # dict-aware helpers must surface it as ok=false, not crash on the non-nullable id. Script the
+    # raw JSON dict (Pascal keys) call_raw really returns.
+    raw = {
+        "NegativeKeywordIds": [{"Ids": [None]}],
+        "NestedPartialErrors": [
+            {"BatchErrors": [{"Code": "DuplicateNegativeKeyword", "Message": "dup"}]}
+        ],
+    }
+    client = _FakeClient(raw)
+    result = negatives.add_negative_keywords(
+        client, entity_id="1", entity_type="Campaign", keywords=["astound login"]
+    )
+    assert result.ok is False and result.ids == []
+    assert result.partial_errors == ["DuplicateNegativeKeyword: dup"]

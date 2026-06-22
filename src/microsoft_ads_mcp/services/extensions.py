@@ -218,7 +218,9 @@ def _add_and_associate(
     client: MsAdsClient, ext: Any, entity_id: str | None, association_type: str, label: str
 ) -> MutationResult:
     """Create an extension, then (optionally) associate it to a campaign/ad group."""
-    resp = client.call(
+    # call_raw: a rejected extension returns a null id (with the reason in PartialErrors), which the
+    # typed identity model can't parse (its id is a non-nullable string); the raw dict surfaces it.
+    resp = client.call_raw(
         CAMPAIGN,
         "add_ad_extensions",
         AddAdExtensionsRequest(account_id=client.account_id, ad_extensions=[ext]),

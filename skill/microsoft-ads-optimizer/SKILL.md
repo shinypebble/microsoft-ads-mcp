@@ -152,7 +152,9 @@ data — treat missing numbers as "unknown", not "zero".
   `update_call_extension(ad_extension_id, is_call_tracking_enabled=true)`. Microsoft then shows a
   forwarding number; new ones are local (toll-free forwarding is no longer provisioned), so a
   toll-free brand number gets a local tracking number. `get_ad_extensions` reports the current
-  `is_call_tracking_enabled` so you can confirm a plain number really has tracking on.
+  `is_call_tracking_enabled` (confirm a plain number really has tracking on) and `is_call_only`
+  (the "Show just my phone number" call-only mobile format, settable on `add_call_extension` /
+  `update_call_extension`).
 - Conversion goals / UET: `create_conversion_goal(name, goal_type, ...)` adds a goal —
   `goal_type="OfflineConversion"` (keyed by MSCLKID, no UET tag) or a UET-backed web goal
   (`Url`/`Event`/`Duration`/`PagesViewedPerVisit`, which require a `tag_id` from `get_uet_tags`).
@@ -183,11 +185,15 @@ data — treat missing numbers as "unknown", not "zero".
   campaign (auto-created), updated in place — read it first with `get_location_intent`.
 - Ad scheduling / dayparting: `add_ad_schedules(campaign_id, schedules)` where each window is
   `{day, from_hour, from_minute, to_hour, to_minute, bid_adjustment}` (days "Monday".."Sunday",
-  minutes at 15-min granularity: 0/15/30/45). Windows are additive; remove one with
-  `remove_ad_schedules(campaign_id, criterion_ids)` using ids from `get_ad_schedules`. The hours
-  run in the campaign `time_zone` unless you pass `use_searcher_time_zone=true`; set the campaign
-  zone itself with `update_campaign(campaign_id, time_zone="CentralTimeUSCanada")`. Read the
-  current schedule first so you don't duplicate windows.
+  minutes at 15-min granularity: 0/15/30/45). Windows are additive, but a same-day window may
+  **not** overlap an existing one — the API rejects that, so to change or extend a window use
+  `replace_ad_schedule(campaign_id, criterion_id, new_window)` (it removes the old criterion then
+  adds the new one — the only safe order; adding over the old window first fails) rather than a
+  plain `add_ad_schedules`. Remove one outright with `remove_ad_schedules(campaign_id,
+  criterion_ids)` using ids from `get_ad_schedules`. The hours run in the campaign `time_zone`
+  unless you pass `use_searcher_time_zone=true`; set the campaign zone itself with
+  `update_campaign(campaign_id, time_zone="CentralTimeUSCanada")`. Read the current schedule first
+  so you don't duplicate windows.
 - Device bid adjustments: `set_device_bid_adjustment(campaign_id, device, bid_adjustment)` sets a
   per-device modifier (-100 to 900 percent; -100 excludes the device). `device` is "Computers"
   (desktop/laptop), "Smartphones" (mobile — there is no "Mobile"), or "Tablets". Device criterions

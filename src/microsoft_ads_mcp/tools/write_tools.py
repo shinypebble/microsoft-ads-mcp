@@ -990,6 +990,12 @@ def register(mcp: FastMCP) -> None:
         unless you pass use_searcher_time_zone=true. Read existing windows with get_ad_schedules
         first to avoid duplicates.
 
+        A new window for a day may NOT overlap an existing window on that same day -- the API
+        rejects the add (returned as ok=false with a partial error, not a crash). To change or
+        extend a window, remove_ad_schedules the old criterion first and then add the new one, in
+        that order (adding the overlapping window first fails); or use replace_ad_schedule, which
+        does the remove-then-add for a single window in one call.
+
         Args:
             campaign_id: The campaign id.
             schedules: Windows to add, each {day, from_hour, from_minute, to_hour, to_minute,
@@ -1018,6 +1024,39 @@ def register(mcp: FastMCP) -> None:
         return guarded(
             lambda: criteria.remove_ad_schedules(
                 get_client(), campaign_id=campaign_id, criterion_ids=criterion_ids
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def replace_ad_schedule(
+        campaign_id: str,
+        criterion_id: str,
+        new_window: AdScheduleInput,
+        use_searcher_time_zone: bool | None = None,
+    ) -> MutationResult:
+        """Replace one ad-schedule (dayparting) window: remove the old criterion, add a new one.
+
+        The API rejects adding a window that overlaps an existing same-day window, so an in-place
+        edit is impossible; this does the only safe sequence -- remove the old criterion, then add
+        new_window -- in one call. Get the criterion_id from get_ad_schedules. If the remove fails,
+        nothing changes; if the add fails after the remove, the result says so (the old window is
+        gone, so that slot is briefly uncovered until you re-add it).
+
+        Args:
+            campaign_id: The campaign id.
+            criterion_id: The existing window's criterion id (from get_ad_schedules) to replace.
+            new_window: The replacement window {day, from_hour, from_minute, to_hour, to_minute,
+                bid_adjustment}. day is "Monday".."Sunday"; minutes are 0/15/30/45.
+            use_searcher_time_zone: If set, also updates the campaign flag controlling whether the
+                hours are interpreted in each searcher's time zone (true) or the campaign's (false).
+        """
+        return guarded(
+            lambda: criteria.replace_ad_schedule(
+                get_client(),
+                campaign_id=campaign_id,
+                criterion_id=criterion_id,
+                new_window=new_window,
+                use_searcher_time_zone=use_searcher_time_zone,
             )
         )
 
