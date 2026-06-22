@@ -1,0 +1,66 @@
+src/microsoft_ads_mcp/domain/entities.py
+  s_f15afab6fab82e::t_13c702036f8440 85-119
+  s_f15afab6fab82e::t_1a5311692e724f 615
+  s_f15afab6fab82e::t_6e80bba0f75df0 610-614,616-626
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_f15afab6fab82e::t_91133ead23ea7a 721-722
+  s_f15afab6fab82e::t_5a9d6b01f603a4 730
+  s_f15afab6fab82e::t_c68888662cc875 1-2
+  s_f15afab6fab82e::t_0f68d4b24efccb 17-18,20,26-27
+  s_f15afab6fab82e::t_96d618532b17f2 834-861
+  s_f15afab6fab82e::t_b89df45759b6fa 685-720,723-729,731-779
+src/microsoft_ads_mcp/api/client.py
+  s_f15afab6fab82e::t_3eb9a602762320 10,15
+  s_f15afab6fab82e::t_869953b96671c2 127-143,148-149,157-183
+tests/test_read_only_gating.py
+  s_f15afab6fab82e::t_247cb1561c5053 31,33
+skill/microsoft-ads-optimizer/SKILL.md
+  s_f15afab6fab82e::t_cb48581e43da79 156-165,169-175
+tests/test_conversions.py
+  s_f15afab6fab82e::t_9f156090d64cde 215-219,223-225,227-324,326-379,381-384,407,409-461,463-528
+  s_f15afab6fab82e::t_b569130e76f526 1-2,12
+  s_f15afab6fab82e::t_d66f35f542eb75 325,380
+  s_f15afab6fab82e::t_9f074e3af3eb43 392-396,400-402
+  s_f15afab6fab82e::t_09a4ca3289091c 6,462
+  s_f15afab6fab82e::t_0a331ca0ee2646 385-391,397-399,403-406
+  s_f15afab6fab82e::t_939862f7738c12 27-31
+  s_f15afab6fab82e::t_ad37fa2a2ecb3e 220-222
+  s_f15afab6fab82e::t_8545b0245c1046 408
+  s_f15afab6fab82e::t_7b76a0d08f28ed 226
+src/microsoft_ads_mcp/services/__init__.py
+  s_f15afab6fab82e::t_cc3454ca9c2a65 22-26,28
+src/microsoft_ads_mcp/services/conversions.py
+  s_f15afab6fab82e::t_f714ed725845a3 73
+  s_f15afab6fab82e::t_63b840ae342046 355
+  s_f15afab6fab82e::t_09a4ca3289091c 13,391
+  s_f15afab6fab82e::t_6785714954039e 241-354,356-357,362-390,392-440
+  s_f15afab6fab82e::t_af1d020348214b 1,6-8,16-21,24-25,33-35,41,44-49
+  s_f15afab6fab82e::t_dbf7ff14b9f788 63-72,74-75
+  s_f15afab6fab82e::t_ee87eb1d8ef35f 358-361
+  s_f15afab6fab82e::t_e258fff26bfbc6 111-139,150,163
+README.md
+  s_f15afab6fab82e::t_145f13fd242df9 185-189,192-196
+src/microsoft_ads_mcp/server.py
+  s_f15afab6fab82e::t_c7d3cadf223fe4 75-77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "ed0ec40414082998034a27d9fffdbf4211592da0",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_f15afab6fab82e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e94e174d-1eac-4b2e-adf6-74d9a743e603",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
