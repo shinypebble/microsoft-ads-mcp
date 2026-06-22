@@ -1,0 +1,39 @@
+tests/test_conversions.py
+  s_f15afab6fab82e::t_31c522dae861a5 197-198
+src/microsoft_ads_mcp/domain/entities.py
+  s_f15afab6fab82e::t_9a21e6bf1103bf 923
+  s_f15afab6fab82e::t_5129d59b9b8e01 908-922,924-926
+  s_f15afab6fab82e::t_d13d91a4aeb277 483
+src/microsoft_ads_mcp/services/conversions.py
+  s_f15afab6fab82e::t_f75019fd95753a 79-83
+  s_f15afab6fab82e::t_75be32ccafac39 98-100
+  s_f15afab6fab82e::t_7ebc647083b5dc 115-119
+  s_f15afab6fab82e::t_93ab25bab715c7 22-24
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_f15afab6fab82e::t_f3fd90140c378f 849-851
+  s_f15afab6fab82e::t_4b63d49ba9e880 713-715
+  s_f15afab6fab82e::t_7313c9aaa8c03b 733-734
+skill/microsoft-ads-optimizer/SKILL.md
+  s_f15afab6fab82e::t_c1bb30c707a328 160-161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "c22d12f9e29e28a8f26100c3f62d76ed1f129c26",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_f15afab6fab82e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e94e174d-1eac-4b2e-adf6-74d9a743e603",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
