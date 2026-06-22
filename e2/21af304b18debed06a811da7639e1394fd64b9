@@ -1,0 +1,73 @@
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_ff989453f4cfee::t_d08554231dd149 993-998
+  s_ff989453f4cfee::t_3fb0e59bc28209 1037
+  s_ff989453f4cfee::t_99a8b2add0a45a 1031-1036,1038-1062
+tests/test_mutations.py
+  s_ff989453f4cfee::t_36a792737ee076 35-38
+  s_ff989453f4cfee::t_998067ebd45abb 53-55
+  s_ff989453f4cfee::t_ef2868060fadd4 361-386
+tests/test_extensions.py
+  s_ff989453f4cfee::t_d494e96cc4e777 26-30
+  s_ff989453f4cfee::t_9c279772847a41 256-275
+  s_ff989453f4cfee::t_19f7186a6bc4aa 67-90
+src/microsoft_ads_mcp/services/mutations.py
+  s_ff989453f4cfee::t_1739d6ed6c4013 332-335,344-348
+  s_ff989453f4cfee::t_6b36638a3292ab 199-201
+  s_ff989453f4cfee::t_16dbfcb341a432 281-283
+  s_ff989453f4cfee::t_2017a1ba3d26c2 387-389
+src/microsoft_ads_mcp/services/extensions.py
+  s_ff989453f4cfee::t_8337498bb485d3 221-223
+tests/test_negatives.py
+  s_ff989453f4cfee::t_295b59cdc09d9f 24-28
+  s_ff989453f4cfee::t_41bd53847e3814 96-113
+tests/test_read_only_gating.py
+  s_ff989453f4cfee::t_296ff4486aad96 37-39
+tests/test_geo_criteria_bulk.py
+  s_ff989453f4cfee::t_28ee11ee725083 351-353
+  s_ff989453f4cfee::t_a761b588bdfff0 418-445
+  s_ff989453f4cfee::t_81f5dfb4b9c887 102-106
+  s_ff989453f4cfee::t_443a19d4a177a2 314-350,354-417
+  s_ff989453f4cfee::t_444e489bc07586 50-54
+skill/microsoft-ads-optimizer/SKILL.md
+  s_ff989453f4cfee::t_18f58ce81ca814 155-157
+  s_ff989453f4cfee::t_34861346bc74b4 188-196
+tests/test_url_tracking.py
+  s_ff989453f4cfee::t_5d06dd34a7d2cc 38-41
+src/microsoft_ads_mcp/services/negatives.py
+  s_ff989453f4cfee::t_f54e7f77645cce 67-70
+src/microsoft_ads_mcp/services/criteria.py
+  s_ff989453f4cfee::t_f60c78a8c9024b 358-361
+  s_ff989453f4cfee::t_2d0e0bec9e71c0 445-468,472-480,484-486
+  s_ff989453f4cfee::t_59c6309bb59a61 469-471,482-483
+  s_ff989453f4cfee::t_e59d1963a41300 481
+  s_ff989453f4cfee::t_178a138d80754c 579-581
+  s_ff989453f4cfee::t_058708d1970bf9 144-146
+  s_ff989453f4cfee::t_f9b2ecd438d856 248-250
+README.md
+  s_ff989453f4cfee::t_97b43569b74c26 202-207
+  s_ff989453f4cfee::t_6c9570d073ca12 184-186
+src/microsoft_ads_mcp/domain/entities.py
+  s_ff989453f4cfee::t_b6d55951fe02fa 437-439
+  s_ff989453f4cfee::t_3f9a89594ffefc 455
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "e221af304b18debed06a811da7639e1394fd64b9",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_ff989453f4cfee": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b801915b-9561-4100-8006-53715952a3cd",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
