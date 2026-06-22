@@ -1,4 +1,5 @@
-"""Write tools — registered only when READ_ONLY is false. New entities are created paused."""
+"""Write tools — registered only when READ_ONLY is false. New campaigns/ad groups/ads are created
+paused (a conversion goal does not spend, so it is created active)."""
 
 from __future__ import annotations
 
@@ -13,12 +14,17 @@ from ..domain.entities import (
     BidStrategyTypeInput,
     CampaignStatus,
     ConversionCountType,
+    ConversionGoalCategoryType,
+    ConversionGoalTypeInput,
     ConversionRevenueType,
+    ExpressionOperatorType,
     IntentOption,
     MatchType,
     MutationResult,
     NegativeEntityType,
     Network,
+    OfflineConversionInput,
+    ValueOperatorType,
 )
 from ..services import (
     account_properties,
@@ -676,6 +682,102 @@ def register(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def create_conversion_goal(
+        name: str,
+        goal_type: ConversionGoalTypeInput,
+        tag_id: str | None = None,
+        status: CampaignStatus | None = None,
+        count_type: ConversionCountType | None = None,
+        conversion_window_in_minutes: int | None = None,
+        goal_category: ConversionGoalCategoryType | None = None,
+        revenue_type: ConversionRevenueType | None = None,
+        revenue_value: float | None = None,
+        revenue_currency_code: str | None = None,
+        exclude_from_bidding: bool | None = None,
+        url_expression: str | None = None,
+        url_operator: ExpressionOperatorType = "Equals",
+        category_expression: str | None = None,
+        category_operator: ExpressionOperatorType | None = None,
+        action_expression: str | None = None,
+        action_operator: ExpressionOperatorType | None = None,
+        label_expression: str | None = None,
+        label_operator: ExpressionOperatorType | None = None,
+        value: float | None = None,
+        value_operator: ValueOperatorType | None = None,
+        minimum_duration_in_seconds: int | None = None,
+        minimum_pages_viewed: int | None = None,
+    ) -> MutationResult:
+        """Create a conversion goal. Goals are created Active (a goal does not spend; a paused goal
+        silently fails to record conversions) — pass status="Paused" to override.
+
+        Microsoft has no native "calls from ads" goal. The bid-eligible path for phone calls is an
+        "OfflineConversion" goal fed by apply_offline_conversions (keyed by MSCLKID) — create that
+        goal here, then upload qualifying calls with apply_offline_conversions.
+
+        Args:
+            name: Goal name. For an OfflineConversion goal, this is the name you pass as
+                conversion_name to apply_offline_conversions.
+            goal_type: One of "OfflineConversion", "Url", "Event", "Duration",
+                "PagesViewedPerVisit". The four web goals require tag_id; OfflineConversion does
+                not (it keys on MSCLKID).
+            tag_id: UET tag id (from get_uet_tags) — REQUIRED for the web goals, must be omitted for
+                OfflineConversion (it is keyed by MSCLKID, not a UET tag).
+            status: "Active" (default) or "Paused".
+            count_type: "All" (every conversion per click) or "Unique" (one per click).
+            conversion_window_in_minutes: Click-to-conversion lookback in minutes (e.g. 43200 = 30
+                days).
+            goal_category: Reporting category, e.g. "Purchase", "SubmitLeadForm", "Contact".
+                Required for "Event" goals (Microsoft rejects an Event goal with no category).
+            revenue_type: Value model — "FixedValue" (requires revenue_value), "VariableValue", or
+                "NoValue".
+            revenue_value: Revenue amount (required for "FixedValue").
+            revenue_currency_code: ISO currency code for revenue_value, e.g. "USD".
+            exclude_from_bidding: Omit to inherit Microsoft's default (false = included in bidding);
+                true excludes the goal from the Conversions column and ECPC/tCPA bid math.
+            url_expression: Url goal — the URL to match (required for "Url").
+            url_operator: Url goal — match operator: "Equals" (default), "BeginsWith",
+                "RegularExpression", "Contains".
+            category_expression, category_operator, action_expression, action_operator,
+                label_expression, label_operator: Event goal — the UET event fields to match (at
+                least one expression is required for "Event"). Operators are "Equals"/"BeginsWith"/
+                "RegularExpression"/"Contains".
+            value, value_operator: Event goal — optional numeric event value and its comparison
+                ("Equals"/"LessThan"/"GreaterThan").
+            minimum_duration_in_seconds: Duration goal — minimum time-on-site in seconds (required
+                for "Duration"). Note: this measures UET dwell time, NOT phone-call length.
+            minimum_pages_viewed: PagesViewedPerVisit goal — minimum pages per visit (required for
+                "PagesViewedPerVisit").
+        """
+        return guarded(
+            lambda: conversions.create_conversion_goal(
+                get_client(),
+                name=name,
+                goal_type=goal_type,
+                tag_id=tag_id,
+                status=status,
+                count_type=count_type,
+                conversion_window_in_minutes=conversion_window_in_minutes,
+                goal_category=goal_category,
+                revenue_type=revenue_type,
+                revenue_value=revenue_value,
+                revenue_currency_code=revenue_currency_code,
+                exclude_from_bidding=exclude_from_bidding,
+                url_expression=url_expression,
+                url_operator=url_operator,
+                category_expression=category_expression,
+                category_operator=category_operator,
+                action_expression=action_expression,
+                action_operator=action_operator,
+                label_expression=label_expression,
+                label_operator=label_operator,
+                value=value,
+                value_operator=value_operator,
+                minimum_duration_in_seconds=minimum_duration_in_seconds,
+                minimum_pages_viewed=minimum_pages_viewed,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
     def update_conversion_goal(
         goal_id: str,
         name: str | None = None,
@@ -725,6 +827,35 @@ def register(mcp: FastMCP) -> None:
                 revenue_type=revenue_type,
                 revenue_value=revenue_value,
                 revenue_currency_code=revenue_currency_code,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def apply_offline_conversions(
+        conversions_to_apply: list[OfflineConversionInput],
+    ) -> MutationResult:
+        """Import offline conversions against an OfflineConversion goal, keyed by MSCLKID.
+
+        This is the bid-eligible path for phone calls: create an OfflineConversion goal with
+        create_conversion_goal, apply your own qualifying filter to the call-center log (e.g. keep
+        calls >=60s), then upload one record per qualifying call. Each record is attributed to the
+        click that drove it and counted under the goal whose name matches conversion_name. Returns
+        per-record errors in partial_errors (the API returns no ids).
+
+        Args:
+            conversions_to_apply: One or more conversions. Each has:
+                click_id — the MSCLKID from the ad click (Microsoft auto-tags it onto landing-page
+                    URLs; see get_account_url_options);
+                conversion_name — must match an existing OfflineConversion goal's name;
+                conversion_time — ISO-8601 timestamp (treated as UTC if no offset given), after the
+                    click and within the goal's conversion window;
+                value — optional conversion value (requires currency_code);
+                currency_code — ISO 4217 code for value, e.g. "USD".
+        """
+        return guarded(
+            lambda: conversions.apply_offline_conversions(
+                get_client(),
+                conversions=conversions_to_apply,
             )
         )
 

@@ -1,13 +1,15 @@
-"""Conversion-goal and UET-tag flows: rename via subtype rebuild, UET partial update."""
+"""Conversion-goal and UET-tag flows: create, rename via subtype rebuild, UET partial update,
+and offline-conversion import."""
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
 from openapi_client.models.campaign.conversion_goal import ConversionGoal
 
-from microsoft_ads_mcp.domain.entities import ConversionGoalSummary
+from microsoft_ads_mcp.domain.entities import ConversionGoalSummary, OfflineConversionInput
 from microsoft_ads_mcp.services import conversions
 
 
@@ -19,6 +21,11 @@ class _ScriptedClient:
         self.calls: list[tuple[str, str, Any]] = []
 
     def call(self, service: str, method: str, request: Any) -> Any:
+        self.calls.append((service, method, request))
+        return self._responses.pop(0)
+
+    def call_raw(self, service: str, method: str, request: Any) -> Any:
+        # create_conversion_goal reads the raw JSON dict; tests script dicts for it.
         self.calls.append((service, method, request))
         return self._responses.pop(0)
 
@@ -205,3 +212,317 @@ def test_update_uet_tag_partial() -> None:
     tag = request.uet_tags[0]
     assert tag.id == "9" and tag.name == "GCF UET"
     assert tag.description is None  # untouched field stays unset
+
+
+# --- create_conversion_goal -------------------------------------------------------------------
+
+
+def _create_resp(ids: list[str | None] | None = None, errors: list[Any] | None = None) -> dict:
+    # create_conversion_goal reads the raw JSON via call_raw, so script the dict Microsoft sends.
+    return {"ConversionGoalIds": ids, "PartialErrors": errors}
+
+
+def test_create_offline_conversion_goal_builds_offline_subtype() -> None:
+    # Offline goals key on MSCLKID: no UET TagId, and no Id in the request (the API assigns it).
+    client = _ScriptedClient([_create_resp(["999"])])
+    result = conversions.create_conversion_goal(
+        client, name="Qualified Calls", goal_type="OfflineConversion"
+    )
+    assert result.ok and result.ids == ["999"]
+    _, method, request = client.calls[0]
+    assert method == "add_conversion_goals"
+    sent = request.conversion_goals[0]
+    assert type(sent).__name__ == "OfflineConversionGoal"
+    d = sent.to_dict()
+    assert d == {"Name": "Qualified Calls", "Type": sent.type}
+    assert "TagId" not in d and "Id" not in d
+
+
+def test_create_url_goal_with_tag_and_revenue() -> None:
+    client = _ScriptedClient([_create_resp(["111"])])
+    result = conversions.create_conversion_goal(
+        client,
+        name="Lead",
+        goal_type="Url",
+        tag_id="555",
+        url_expression="contact/thanks",
+        url_operator="Contains",
+        revenue_type="FixedValue",
+        revenue_value=12.5,
+        revenue_currency_code="USD",
+    )
+    assert result.ok and result.ids == ["111"]
+    sent = client.calls[0][2].conversion_goals[0]
+    assert type(sent).__name__ == "UrlGoal"
+    d = sent.to_dict()
+    assert d == {
+        "Name": "Lead",
+        "Type": sent.type,
+        "TagId": "555",
+        "Revenue": {"Type": "FixedValue", "Value": 12.5, "CurrencyCode": "USD"},
+        "UrlExpression": "contact/thanks",
+        "UrlOperator": sent.url_operator,
+    }
+
+
+def test_create_event_goal_sets_expression_fields() -> None:
+    client = _ScriptedClient([_create_resp(["222"])])
+    result = conversions.create_conversion_goal(
+        client,
+        name="Video Play",
+        goal_type="Event",
+        tag_id="555",
+        category_expression="video",
+        category_operator="Equals",
+        action_expression="play",
+        action_operator="Equals",
+        value=5.0,
+        value_operator="GreaterThan",
+    )
+    assert result.ok
+    sent = client.calls[0][2].conversion_goals[0]
+    assert type(sent).__name__ == "EventGoal"
+    d = sent.to_dict()
+    assert d["CategoryExpression"] == "video"
+    assert d["ActionExpression"] == "play"
+    assert d["Value"] == 5.0
+    assert d["TagId"] == "555"
+
+
+def test_create_duration_goal_sets_minimum() -> None:
+    client = _ScriptedClient([_create_resp(["333"])])
+    result = conversions.create_conversion_goal(
+        client,
+        name="Dwell 60s",
+        goal_type="Duration",
+        tag_id="555",
+        minimum_duration_in_seconds=60,
+    )
+    assert result.ok
+    sent = client.calls[0][2].conversion_goals[0]
+    assert type(sent).__name__ == "DurationGoal"
+    assert sent.to_dict()["MinimumDurationInSeconds"] == 60
+
+
+def test_create_pages_viewed_goal_sets_minimum() -> None:
+    client = _ScriptedClient([_create_resp(["444"])])
+    result = conversions.create_conversion_goal(
+        client,
+        name="3+ pages",
+        goal_type="PagesViewedPerVisit",
+        tag_id="555",
+        minimum_pages_viewed=3,
+    )
+    assert result.ok
+    sent = client.calls[0][2].conversion_goals[0]
+    assert type(sent).__name__ == "PagesViewedPerVisitGoal"
+    assert sent.to_dict()["MinimumPagesViewed"] == 3
+
+
+def test_create_web_goal_without_tag_id_raises() -> None:
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="tag_id"):
+        conversions.create_conversion_goal(client, name="Lead", goal_type="Url", url_expression="x")
+
+
+def test_create_offline_goal_with_tag_id_raises() -> None:
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="tag_id"):
+        conversions.create_conversion_goal(
+            client, name="Calls", goal_type="OfflineConversion", tag_id="555"
+        )
+
+
+def test_create_url_goal_missing_url_expression_raises() -> None:
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="url_expression"):
+        conversions.create_conversion_goal(client, name="Lead", goal_type="Url", tag_id="555")
+
+
+def test_create_goal_rejects_mismatched_type_field() -> None:
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="only valid for PagesViewedPerVisit"):
+        conversions.create_conversion_goal(
+            client,
+            name="Lead",
+            goal_type="Url",
+            tag_id="555",
+            url_expression="x",
+            minimum_pages_viewed=3,
+        )
+
+
+def test_create_goal_unknown_type_raises() -> None:
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="goal_type must be"):
+        conversions.create_conversion_goal(client, name="x", goal_type="Bogus")
+
+
+def test_create_goal_fixedvalue_without_value_raises() -> None:
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="revenue_value is required"):
+        conversions.create_conversion_goal(
+            client, name="Calls", goal_type="OfflineConversion", revenue_type="FixedValue"
+        )
+
+
+def test_create_goal_revenue_value_without_type_raises() -> None:
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="revenue_type is required"):
+        conversions.create_conversion_goal(
+            client, name="Calls", goal_type="OfflineConversion", revenue_value=5.0
+        )
+
+
+def test_create_goal_partial_errors() -> None:
+    err = type("E", (), {"message": "dup", "code": 4001})()
+    client = _ScriptedClient([_create_resp(None, [err])])
+    result = conversions.create_conversion_goal(client, name="Calls", goal_type="OfflineConversion")
+    assert not result.ok and result.ids == []
+    assert result.partial_errors == ["4001: dup"]
+
+
+def test_create_goal_null_id_surfaces_partial_error() -> None:
+    # Microsoft returns HTTP 200 with ConversionGoalIds=[null] + PartialErrors when a goal is
+    # rejected. call_raw + dict-aware first_attr must surface the error cleanly (no crash, no
+    # phantom id) instead of the SDK's non-nullable-string deserialization blowing up.
+    resp = {
+        "ConversionGoalIds": [None],
+        "PartialErrors": [
+            {
+                "ErrorCode": "InvalidGoalCategory",
+                "Message": "The Goal Category is invalid.",
+                "Code": 3347,
+            }
+        ],
+    }
+    client = _ScriptedClient([resp])
+    result = conversions.create_conversion_goal(
+        client, name="Bad", goal_type="Event", tag_id="555", category_expression="x"
+    )
+    assert not result.ok and result.ids == []
+    assert result.partial_errors == ["InvalidGoalCategory: The Goal Category is invalid."]
+
+
+def test_create_goal_defaults_to_active() -> None:
+    # A goal doesn't spend, so the default is active; we never send Status=Paused.
+    client = _ScriptedClient([_create_resp(["999"])])
+    conversions.create_conversion_goal(client, name="Calls", goal_type="OfflineConversion")
+    assert "Status" not in client.calls[0][2].conversion_goals[0].to_dict()
+
+
+def test_create_goal_exclude_from_bidding_false_is_sent() -> None:
+    client = _ScriptedClient([_create_resp(["999"])])
+    conversions.create_conversion_goal(
+        client, name="Calls", goal_type="OfflineConversion", exclude_from_bidding=False
+    )
+    assert client.calls[0][2].conversion_goals[0].to_dict()["ExcludeFromBidding"] is False
+
+
+# --- apply_offline_conversions ----------------------------------------------------------------
+
+
+def test_apply_offline_conversions_builds_request() -> None:
+    client = _ScriptedClient([type("R", (), {"partial_errors": None})()])
+    result = conversions.apply_offline_conversions(
+        client,
+        conversions=[
+            OfflineConversionInput(
+                click_id="CLICK123",
+                conversion_name="Qualified Calls",
+                conversion_time="2026-06-01T12:00:00+00:00",
+                value=40.0,
+                currency_code="USD",
+            )
+        ],
+    )
+    assert result.ok and result.ids == []
+    _, method, request = client.calls[0]
+    assert method == "apply_offline_conversions"
+    sent = request.offline_conversions[0]
+    assert type(sent).__name__ == "OfflineConversion"
+    assert sent.microsoft_click_id == "CLICK123"
+    assert sent.conversion_name == "Qualified Calls"
+    assert sent.conversion_value == 40.0
+    assert sent.conversion_currency_code == "USD"
+    assert isinstance(sent.conversion_time, datetime)
+
+
+def test_apply_offline_conversion_naive_time_is_utc() -> None:
+    client = _ScriptedClient([type("R", (), {"partial_errors": None})()])
+    conversions.apply_offline_conversions(
+        client,
+        conversions=[
+            OfflineConversionInput(
+                click_id="C", conversion_name="Calls", conversion_time="2026-06-01T12:00:00"
+            )
+        ],
+    )
+    sent = client.calls[0][2].offline_conversions[0]
+    assert sent.conversion_time.tzinfo == UTC
+
+
+def test_apply_offline_conversion_offset_time_preserved() -> None:
+    client = _ScriptedClient([type("R", (), {"partial_errors": None})()])
+    conversions.apply_offline_conversions(
+        client,
+        conversions=[
+            OfflineConversionInput(
+                click_id="C",
+                conversion_name="Calls",
+                conversion_time="2026-06-01T08:00:00-04:00",
+            )
+        ],
+    )
+    sent = client.calls[0][2].offline_conversions[0]
+    assert sent.conversion_time.utcoffset() == timedelta(hours=-4)
+
+
+def test_apply_offline_conversions_bad_time_raises() -> None:
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="ISO-8601"):
+        conversions.apply_offline_conversions(
+            client,
+            conversions=[
+                OfflineConversionInput(
+                    click_id="C", conversion_name="Calls", conversion_time="June 1, 2026"
+                )
+            ],
+        )
+
+
+def test_apply_offline_conversions_empty_list_raises() -> None:
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="at least one"):
+        conversions.apply_offline_conversions(client, conversions=[])
+
+
+def test_apply_offline_conversions_value_without_currency_raises() -> None:
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="currency_code is required"):
+        conversions.apply_offline_conversions(
+            client,
+            conversions=[
+                OfflineConversionInput(
+                    click_id="C",
+                    conversion_name="Calls",
+                    conversion_time="2026-06-01T12:00:00Z",
+                    value=10.0,
+                )
+            ],
+        )
+
+
+def test_apply_offline_conversions_partial_errors() -> None:
+    err = type("E", (), {"message": "bad msclkid", "code": 5001})()
+    client = _ScriptedClient([type("R", (), {"partial_errors": [err]})()])
+    result = conversions.apply_offline_conversions(
+        client,
+        conversions=[
+            OfflineConversionInput(
+                click_id="C", conversion_name="Calls", conversion_time="2026-06-01T12:00:00Z"
+            )
+        ],
+    )
+    assert not result.ok and result.ids == []
+    assert result.partial_errors == ["5001: bad msclkid"]

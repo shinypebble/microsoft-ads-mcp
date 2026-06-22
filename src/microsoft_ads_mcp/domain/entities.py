@@ -82,6 +82,41 @@ BidStrategyTypeInput = Literal[
 # straight onto the API. (Goal status reuses CampaignStatus -- Active / Paused.)
 ConversionCountType = Literal["All", "Unique"]
 ConversionRevenueType = Literal["FixedValue", "VariableValue", "NoValue"]
+# The conversion-goal subtypes create_conversion_goal can build. OfflineConversion is keyed by
+# MSCLKID (no UET tag); the four web goals all require a UET TagId. AppInstall / InStoreTransaction
+# are deliberately omitted. Microsoft's ConversionGoalType spellings, used verbatim.
+ConversionGoalTypeInput = Literal[
+    "OfflineConversion",
+    "Url",
+    "Event",
+    "Duration",
+    "PagesViewedPerVisit",
+]
+# Operators for a goal's match expressions (Url goal's UrlOperator, Event goal's category/action/
+# label operators). Microsoft's ExpressionOperator spellings, used verbatim.
+ExpressionOperatorType = Literal["Equals", "BeginsWith", "RegularExpression", "Contains"]
+# Operator for an Event goal's numeric Value comparison. Microsoft's ValueOperator spellings.
+ValueOperatorType = Literal["Equals", "LessThan", "GreaterThan"]
+# The conversion-goal category (the goal's reporting bucket). The useful subset of Microsoft's
+# ConversionGoalCategory enum -- "Unknown" is a read-only/system value and is not offered for
+# creation. Spellings used verbatim so they map straight onto the API.
+ConversionGoalCategoryType = Literal[
+    "None",
+    "Purchase",
+    "AddToCart",
+    "BeginCheckout",
+    "Subscribe",
+    "SubmitLeadForm",
+    "BookAppointment",
+    "Signup",
+    "RequestQuote",
+    "GetDirections",
+    "OutboundClick",
+    "Contact",
+    "PageView",
+    "Download",
+    "Other",
+]
 # Days an ad schedule (dayparting) criterion can target. Microsoft's enum spelling is used
 # verbatim so it maps straight onto the API.
 Weekday = Literal[
@@ -570,6 +605,23 @@ class AdScheduleInput(BaseModel):
     from_minute: int = 0  # 0, 15, 30, or 45
     to_minute: int = 0  # 0, 15, 30, or 45
     bid_adjustment: float = 0.0  # percent modifier applied during this window (0 = no change)
+
+
+class OfflineConversionInput(BaseModel):
+    """One offline conversion to upload via apply_offline_conversions.
+
+    The conversion is attributed to the click that drove it (``click_id`` is the MSCLKID Microsoft
+    auto-tags onto landing-page URLs), and counted under the goal whose name matches
+    ``conversion_name`` (create one first with an OfflineConversion ``create_conversion_goal``).
+    For phone-call tracking, filter the call-center log to qualifying calls (e.g. >=60s) yourself,
+    then upload one record per call.
+    """
+
+    click_id: str  # the MSCLKID from the ad click (Microsoft Click ID)
+    conversion_name: str  # must match an existing OfflineConversion goal's name
+    conversion_time: str  # ISO-8601 timestamp; treated as UTC if no offset is given
+    value: float | None = None  # conversion value; if set, currency_code is required
+    currency_code: str | None = None  # ISO 4217 code for value, e.g. "USD"
 
 
 class AdScheduleSummary(BaseModel):

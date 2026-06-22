@@ -182,12 +182,18 @@ and `shortfall`. Every value is a modeled estimate and may be `null` where Micro
   conversions are measured — pass it on `add_call_extension`, or flip it on an existing asset
   with `update_call_extension`. New forwarding numbers are local (toll-free is no longer
   provisioned). `get_ad_extensions` surfaces the current `is_call_tracking_enabled` flag.
-- *Conversion goals / UET tags* — `update_conversion_goal` edits a goal in place: rename, set
-  `status`, and (most launch-relevant) toggle `exclude_from_bidding` — the inverse of the UI's
+- *Conversion goals / UET tags* — `create_conversion_goal` adds a goal: an `OfflineConversion`
+  goal (keyed by MSCLKID, no UET tag) or a UET-backed web goal (`Url` / `Event` / `Duration` /
+  `PagesViewedPerVisit`, which need a `tag_id`). Goals are created **active** (a goal doesn't spend;
+  a paused one silently fails to record). `update_conversion_goal` edits a goal in place: rename,
+  set `status`, and (most launch-relevant) toggle `exclude_from_bidding` — the inverse of the UI's
   "Include in conversions" checkbox, the single switch for whether a goal feeds automated bidding
   (ECPC / tCPA). Also sets `count_type`, `conversion_window_in_minutes`, and the revenue model
-  (`revenue_type` / `revenue_value` / `revenue_currency_code`). `update_uet_tag` renames/redescribes
-  a tag.
+  (`revenue_type` / `revenue_value` / `revenue_currency_code`). For phone calls there is no native
+  "calls from ads" goal: `apply_offline_conversions` is the bid-eligible path — filter the
+  call-center log yourself (e.g. calls ≥60s), then upload qualifying calls by MSCLKID against an
+  `OfflineConversion` goal whose name matches `conversion_name`. `update_uet_tag`
+  renames/redescribes a tag.
 - *Location (ZIP/geo) targeting* — `add_location_targets`, `remove_location_targets`,
   `set_location_intent` (presence — `PeopleIn` — vs. search-interest targeting; one criterion
   per campaign, updated in place).

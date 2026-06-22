@@ -153,15 +153,26 @@ data — treat missing numbers as "unknown", not "zero".
   forwarding number; new ones are local (toll-free forwarding is no longer provisioned), so a
   toll-free brand number gets a local tracking number. `get_ad_extensions` reports the current
   `is_call_tracking_enabled` so you can confirm a plain number really has tracking on.
-- Conversion goals / UET: `update_conversion_goal(goal_id, ...)` edits a goal in place — rename,
-  set `status` ("Active"/"Paused"), and (the launch-relevant lever) toggle
-  `exclude_from_bidding`: the inverse of the UI's "Include in conversions" checkbox and the single
-  switch for whether a goal feeds automated bidding (ECPC/tCPA). `exclude_from_bidding=false`
-  includes it in the Conversions column and bid math; `true` drops it from both (still tracked
-  under All conversions). Also sets `count_type`, `conversion_window_in_minutes`, and revenue
+- Conversion goals / UET: `create_conversion_goal(name, goal_type, ...)` adds a goal —
+  `goal_type="OfflineConversion"` (keyed by MSCLKID, no UET tag) or a UET-backed web goal
+  (`Url`/`Event`/`Duration`/`PagesViewedPerVisit`, which require a `tag_id` from `get_uet_tags`).
+  Goals are created **active** (a goal doesn't spend, and a paused goal silently fails to record).
+  `update_conversion_goal(goal_id, ...)` edits a goal in place — rename, set `status`
+  ("Active"/"Paused"), and (the launch-relevant lever) toggle `exclude_from_bidding`: the inverse of
+  the UI's "Include in conversions" checkbox and the single switch for whether a goal feeds
+  automated bidding (ECPC/tCPA). `exclude_from_bidding=false` includes it in the Conversions column
+  and bid math; `true` drops it from both (still tracked under All conversions). Also sets
+  `count_type`, `conversion_window_in_minutes`, and revenue
   (`revenue_type`/`revenue_value`/`revenue_currency_code`). `update_uet_tag(tag_id, ...)` renames a
   tag. Before unpausing a campaign, confirm each goal you depend on reads
   `exclude_from_bidding=false` via `get_conversion_goals`.
+- Phone-call conversions: Microsoft has **no native "calls from ads" goal** (and `Duration` goals
+  measure UET dwell time, not call length — don't use them for calls). The bid-eligible path is
+  `create_conversion_goal(name, goal_type="OfflineConversion")` then `apply_offline_conversions(...)`:
+  filter the call-center log yourself (e.g. keep calls ≥60s), then upload one record per qualifying
+  call — `click_id` (the MSCLKID), `conversion_name` (matching the goal's name), `conversion_time`
+  (ISO-8601 UTC), and optional `value`/`currency_code`. The call extension's call tracking only
+  feeds the Call Detail report (reporting, not bid-eligible).
 - ZIP/location targeting: `resolve_postal_codes(["98101", ...])` → `add_location_targets(
   campaign_id, location_ids, exclude=False)`; remove by criterion id from `get_location_targets`.
 - Location intent (presence vs. broader reach): `set_location_intent(campaign_id, "PeopleIn")`

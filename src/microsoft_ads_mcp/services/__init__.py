@@ -19,9 +19,13 @@ def as_list(value: Any) -> list[Any]:
 
 
 def first_attr(obj: Any, *names: str, default: Any = None) -> Any:
-    """Return the first present attribute among ``names`` (Pascal/snake tolerant)."""
+    """Return the first present field among ``names`` (Pascal/snake tolerant).
+
+    Works on both SDK model objects (attribute access) and the raw JSON dicts returned by
+    ``MsAdsClient.call_raw`` (key access), so the same response helpers serve either path.
+    """
     for name in names:
-        val = getattr(obj, name, None)
+        val = obj.get(name) if isinstance(obj, dict) else getattr(obj, name, None)
         if val is not None:
             return val
     return default
