@@ -1,0 +1,35 @@
+name: release
+
+# Publish to PyPI via Trusted Publishing (OIDC) whenever a GitHub Release is published.
+# No API token is stored anywhere: GitHub mints a short-lived OIDC token that PyPI trades
+# for upload rights, scoped to this repo + workflow (+ environment). To cut a release:
+#   1. bump `version` in pyproject.toml (PyPI rejects re-uploading an existing version)
+#   2. commit + push to main
+#   3. create a GitHub Release (tag e.g. v0.2.0) -> this workflow runs and publishes
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-26.04-arm
+    environment: release
+    permissions:
+      id-token: write # required for PyPI Trusted Publishing (OIDC)
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          python-version: "3.14"
+          enable-cache: true
+
+      - name: Build sdist + wheel
+        run: uv build
+
+      - name: Publish to PyPI
+        run: uv publish --trusted-publishing always

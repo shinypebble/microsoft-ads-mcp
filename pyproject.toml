@@ -4,6 +4,23 @@ version = "0.1.0"
 description = "MCP server for the Microsoft Advertising (Bing Ads) REST API, oriented toward agent-led campaign management and reporting."
 readme = "README.md"
 requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "microsoft-advertising",
+    "bing-ads",
+    "fastmcp",
+    "advertising",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Office/Business",
+    "Topic :: Internet :: WWW/HTTP",
+]
 dependencies = [
     "fastmcp>=3.4.2,<4",
     # The official Microsoft Advertising REST SDK. Ships the `bingads.*` auth/ServiceClient
@@ -15,6 +32,11 @@ dependencies = [
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/shinypebble/microsoft-ads-mcp"
+Repository = "https://github.com/shinypebble/microsoft-ads-mcp"
+Issues = "https://github.com/shinypebble/microsoft-ads-mcp/issues"
 
 [project.scripts]
 microsoft-ads-mcp = "microsoft_ads_mcp.__main__:main"
