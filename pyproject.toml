@@ -1,6 +1,6 @@
 [project]
 name = "microsoft-ads-mcp"
-version = "0.1.0"
+version = "0.2.0"
 description = "MCP server for the Microsoft Advertising (Bing Ads) REST API, oriented toward agent-led campaign management and reporting."
 readme = "README.md"
 requires-python = ">=3.14"
@@ -54,11 +54,7 @@ packages = ["src/microsoft_ads_mcp"]
 "skill" = "microsoft_ads_mcp/skill"
 
 [dependency-groups]
-dev = [
-    "ruff>=0.15.17",
-    "ty>=0.0.49",
-    "pytest>=9.1.0",
-]
+dev = ["ruff>=0.15.17", "ty>=0.0.49", "pytest>=9.1.0"]
 
 [tool.ruff]
 line-length = 100
