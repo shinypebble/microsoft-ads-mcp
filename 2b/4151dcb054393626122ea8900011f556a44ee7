@@ -1,0 +1,27 @@
+.github/workflows/release.yml
+  s_b2b906b593148f::t_19dffd7db0971b 1-35
+pyproject.toml
+  s_b2b906b593148f::t_1f43b8d196fc44 36-40
+  s_b2b906b593148f::t_1f7381b966f939 7-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.10",
+  "base_commit_sha": "2b4151dcb054393626122ea8900011f556a44ee7",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_b2b906b593148f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3b18ad24-25f9-422d-939b-9eac8e417d96",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
