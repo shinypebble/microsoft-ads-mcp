@@ -1,0 +1,24 @@
+pyproject.toml
+  s_114b3cd8cd12f7::t_506ee212903dd7 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.10",
+  "base_commit_sha": "e4def8db0dd884a4e90b61d439045b11422e0e23",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_114b3cd8cd12f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f085eea7-bec5-4e11-bc30-fb6d68cbbed3",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
