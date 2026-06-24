@@ -1,20 +1,35 @@
-"""Runtime configuration loaded from the environment (and an optional .env file)."""
+"""Runtime configuration loaded from the environment (and optional .env files)."""
 
 from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def config_dir() -> Path:
+    """The cwd-independent config directory, ``~/.config/microsoft-ads``.
+
+    Holds the persisted ``tokens.json`` and an optional ``.env``. Resolved per call (so it
+    follows ``$HOME`` rather than baking a path at import time) -- which keeps tests hermetic
+    and lets a ``uvx microsoft-ads-mcp`` install keep all of its state in one place, working
+    from any directory with no secrets in any project file.
+    """
+    return Path.home() / ".config" / "microsoft-ads"
+
+
 class Settings(BaseSettings):
     """Server settings.
 
-    Read from environment variables (case-insensitive) or a local ``.env`` file. The required
-    values are the developer token and client id; a refresh token is needed to run
-    non-interactively (otherwise mint one with the auth tools).
+    Read from environment variables (case-insensitive) or a ``.env`` file. Two dotenv files are
+    layered, lowest priority first: the cwd-independent ``~/.config/microsoft-ads/.env`` (the
+    only secrets source a ``uvx`` install needs), then a project-local ``.env`` that overrides it
+    for development. Real environment variables outrank both. The required values are the
+    developer token and client id; a refresh token is needed to run non-interactively (otherwise
+    mint one with the auth tools).
 
     Credentials are read from ``MICROSOFT_ADS_*`` env vars; ``READ_ONLY`` and the ``MCP_*``
     transport vars keep their conventional names (matched case-insensitively to the fields).
@@ -29,6 +44,14 @@ class Settings(BaseSettings):
         # back to the environment -- which made tests pass only when real creds were exported.
         validate_by_name=True,
     )
+
+    def __init__(self, **values: Any) -> None:
+        # Layer the dotenv sources low-to-high so secrets can live entirely in the user config
+        # dir (no project file) while a repo-local `.env` still wins for development. Resolved
+        # here (not in `model_config`) so the path follows the live `$HOME`. A caller-supplied
+        # `_env_file` (e.g. in a test) still takes precedence.
+        values.setdefault("_env_file", (config_dir() / ".env", ".env"))
+        super().__init__(**values)
 
     # --- Microsoft Advertising credentials ---
     # Optional at load time so the package imports without secrets (e.g. in tests); the server
@@ -65,7 +88,7 @@ class Settings(BaseSettings):
     @property
     def token_path(self) -> Path:
         """Where minted/refreshed OAuth tokens are persisted (created mode 0600)."""
-        return Path.home() / ".config" / "microsoft-ads" / "tokens.json"
+        return config_dir() / "tokens.json"
 
     @property
     def has_credentials(self) -> bool:

@@ -49,7 +49,30 @@ The REST service base URLs `ServiceClient` targets — set automatically from
 | Ad Insight | `https://adinsight.api.bingads.microsoft.com` | `https://adinsight.api.sandbox.bingads.microsoft.com` |
 | Customer Mgmt / Billing | `https://clientcenter.api.bingads.microsoft.com` | `https://clientcenter.api.sandbox.bingads.microsoft.com` |
 
-## Quickstart
+## Install
+
+The published package runs from anywhere with `uvx` — no clone, no project files. Put your
+credentials in `~/.config/microsoft-ads/.env` (the same directory the server already persists
+OAuth tokens to), then point your MCP client at `uvx microsoft-ads-mcp`:
+
+```bash
+mkdir -p ~/.config/microsoft-ads
+cat > ~/.config/microsoft-ads/.env <<'EOF'
+MICROSOFT_ADS_DEVELOPER_TOKEN=...
+MICROSOFT_ADS_CLIENT_ID=...
+# Optional once you've signed in; otherwise mint one via the auth tools (see Authentication):
+# MICROSOFT_ADS_REFRESH_TOKEN=...
+EOF
+chmod 600 ~/.config/microsoft-ads/.env
+```
+
+This `.env` is read independently of the working directory, so the server works from any repo
+and **no secrets live in any project file** — the MCP client config carries only the non-secret
+operational flags (see [MCP client configuration](#mcp-client-configuration)). Do the one-time
+sign-in once (see [Authentication](#authentication)); the refresh token is then persisted next
+to this file and auto-refreshed.
+
+### From source (development)
 
 ```bash
 uv sync                              # create .venv and install
@@ -59,7 +82,9 @@ uv run python -m microsoft_ads_mcp   # run over stdio (default)
 
 ## Configuration
 
-Set via environment variables or a local `.env` (see [.env.example](.env.example)):
+Credentials and flags load from (highest priority first) real environment variables, a
+project-local `.env`, then the cwd-independent `~/.config/microsoft-ads/.env`. See
+[.env.example](.env.example) for the full list:
 
 | Variable | Required | Notes |
 |---|---|---|
@@ -82,9 +107,32 @@ If you have no refresh token yet, mint one once (interactive):
 
 1. Call `get_auth_url()` → open the URL, sign in.
 2. Copy the redirect URL and call `complete_auth(redirect_url)`.
-3. The refresh token is saved and reused/auto-refreshed thereafter.
+3. The refresh token is saved to `~/.config/microsoft-ads/tokens.json` (mode `0600`) and
+   reused/auto-refreshed thereafter — so you never need to add it to `.env` by hand.
 
 ## MCP client configuration
+
+Recommended — run the published package with `uvx`, credentials in
+`~/.config/microsoft-ads/.env` (see [Install](#install)). The config carries only the non-secret
+flags:
+
+```json
+{
+  "mcpServers": {
+    "microsoft-ads": {
+      "command": "uvx",
+      "args": ["microsoft-ads-mcp"],
+      "env": {
+        "READ_ONLY": "false",
+        "TOOL_SEARCH": "true"
+      }
+    }
+  }
+}
+```
+
+Alternatively, run from a source checkout (development) and/or pass credentials inline instead of
+via `.env`:
 
 ```json
 {
