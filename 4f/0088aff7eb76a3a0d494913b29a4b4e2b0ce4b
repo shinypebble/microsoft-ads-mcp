@@ -1,0 +1,26 @@
+pyproject.toml
+  s_39dd1248670965::t_aea045dbded027 3
+uv.lock
+  s_39dd1248670965::t_b61f8615130dca 606
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "4f0088aff7eb76a3a0d494913b29a4b4e2b0ce4b",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_39dd1248670965": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b791531a-ae01-44ad-bce9-dd9129b3b73b",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
