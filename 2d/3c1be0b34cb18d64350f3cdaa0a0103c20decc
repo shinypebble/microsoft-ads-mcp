@@ -1,0 +1,41 @@
+src/microsoft_ads_mcp/services/extensions.py
+  s_e095b7a7d452da::t_37c82c74fb650f 32-34
+  s_e095b7a7d452da::t_327735b462c017 1,6-7
+  s_e095b7a7d452da::t_900f152f85c202 378-473
+README.md
+  s_e095b7a7d452da::t_cef660fb2649b9 228-229,234-242
+  s_e095b7a7d452da::t_ecc90b640c938d 302
+tests/test_extensions.py
+  s_e095b7a7d452da::t_5bf17e95fab386 389-473,475-476,478-505
+  s_e095b7a7d452da::t_70f888ea18555d 474,477
+tests/test_read_only_gating.py
+  s_e095b7a7d452da::t_5a32e0f0d6ed55 30-31
+src/microsoft_ads_mcp/domain/entities.py
+  s_e095b7a7d452da::t_0f1f92e1ecf53f 440,447-449
+  s_e095b7a7d452da::t_bf30d40c58c99f 466-467
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_e095b7a7d452da::t_d54d6fe1a9ee44 680-736
+src/microsoft_ads_mcp/server.py
+  s_e095b7a7d452da::t_8e495b17810f55 72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "2d3c1be0b34cb18d64350f3cdaa0a0103c20decc",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_e095b7a7d452da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7a25975b-ecb3-4edf-b9b4-926e10800d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
