@@ -27,6 +27,8 @@ WRITE_TOOLS = {
     "add_callout_extension",
     "add_sitelink_extension",
     "update_sitelink_extension",
+    "add_structured_snippet_extension",
+    "update_structured_snippet_extension",
     "add_call_extension",
     "delete_ad_extension",
     "create_conversion_goal",

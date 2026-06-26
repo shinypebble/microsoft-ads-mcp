@@ -1,10 +1,10 @@
-"""Ad-extension flows: list extensions, update a call/sitelink extension, add callout/sitelink.
+"""Ad-extension flows: list extensions; create/update call, sitelink, callout, structured snippet.
 
 Extensions are account-level objects that get *associated* to a campaign or ad group. Adding a
 new extension is therefore two steps: create it (``add_ad_extensions``) then associate it
 (``set_ad_extensions_associations``). Updating an existing one (e.g. a call extension's phone
-number or a sitelink's descriptions) is a single in-place ``update_ad_extensions`` and needs no
-re-association.
+number, a sitelink's descriptions, or a structured snippet's values) is a single in-place
+``update_ad_extensions`` and needs no re-association.
 """
 
 from __future__ import annotations
@@ -29,6 +29,9 @@ from openapi_client.models.campaign.set_ad_extensions_associations_request impor
     SetAdExtensionsAssociationsRequest,
 )
 from openapi_client.models.campaign.sitelink_ad_extension import SitelinkAdExtension
+from openapi_client.models.campaign.structured_snippet_ad_extension import (
+    StructuredSnippetAdExtension,
+)
 from openapi_client.models.campaign.update_ad_extensions_request import UpdateAdExtensionsRequest
 
 from ..api.client import CAMPAIGN, MsAdsClient
@@ -367,6 +370,102 @@ def update_sitelink_extension(
     return MutationResult(
         ok=not errors,
         message=f"Sitelink extension {ad_extension_id} updated" if not errors else "Update failed",
+        ids=[str(ad_extension_id)],
+        partial_errors=errors,
+    )
+
+
+# Microsoft requires a structured snippet to carry between 3 and 10 values (each <= 25 chars).
+_SNIPPET_MIN_VALUES = 3
+_SNIPPET_MAX_VALUES = 10
+
+
+def _clean_snippet_values(values: list[str]) -> list[str]:
+    """Truncate each snippet value to Microsoft's 25-char limit and enforce the 3-10 count rule."""
+    cleaned = [v[:25] for v in values]
+    if not _SNIPPET_MIN_VALUES <= len(cleaned) <= _SNIPPET_MAX_VALUES:
+        raise ValueError(
+            f"A structured snippet requires {_SNIPPET_MIN_VALUES} to {_SNIPPET_MAX_VALUES} "
+            f"values; got {len(cleaned)}."
+        )
+    return cleaned
+
+
+def add_structured_snippet_extension(
+    client: MsAdsClient,
+    *,
+    header: str,
+    values: list[str],
+    entity_id: str | None = None,
+    association_type: str = "Campaign",
+) -> MutationResult:
+    """Create a structured snippet extension and optionally associate it to a campaign/ad group.
+
+    A structured snippet is a ``header`` (from Microsoft's predefined list -- e.g. "Brands",
+    "Services", "Amenities", "Destinations", "Types") followed by 3-10 short ``values``. Microsoft
+    validates the header against that fixed list and rejects an unrecognized one; values are
+    capped at 25 chars each.
+    """
+    ext = StructuredSnippetAdExtension(
+        type="StructuredSnippetAdExtension",
+        header=header[:25],
+        values=_clean_snippet_values(values),
+    )
+    return _add_and_associate(
+        client, ext, entity_id, association_type, "Structured snippet extension"
+    )
+
+
+def update_structured_snippet_extension(
+    client: MsAdsClient,
+    *,
+    ad_extension_id: str,
+    header: str | None = None,
+    values: list[str] | None = None,
+) -> MutationResult:
+    """Update an existing structured snippet extension in place (e.g. edit its header or values).
+
+    Microsoft's update *replaces* the whole StructuredSnippetAdExtension, so both the header and
+    the values list are required on every update and any omitted field would be nulled. To honor
+    the "only the fields you pass change" contract, whenever a field is omitted this fetches the
+    current snippet and re-sends its existing value.
+    """
+    if header is None or values is None:
+        existing = _get_extension(client, ad_extension_id, "StructuredSnippet")
+        if existing is None:
+            return MutationResult(
+                ok=False,
+                message=f"Structured snippet extension {ad_extension_id} not found",
+                ids=[],
+                partial_errors=[f"Structured snippet extension {ad_extension_id} not found"],
+            )
+        current = AdExtensionSummary.from_sdk(existing)
+        if header is None:
+            header = current.header
+        if values is None:
+            values = current.values or []
+
+    fields: dict[str, Any] = {}
+    if header is not None:
+        fields["header"] = header[:25]
+    if values is not None:
+        fields["values"] = _clean_snippet_values(values)
+    ext = StructuredSnippetAdExtension(
+        id=ad_extension_id, type="StructuredSnippetAdExtension", **fields
+    )
+    resp = client.call(
+        CAMPAIGN,
+        "update_ad_extensions",
+        UpdateAdExtensionsRequest(account_id=client.account_id, ad_extensions=[ext]),
+    )
+    errors = nested_partial_errors(resp)
+    return MutationResult(
+        ok=not errors,
+        message=(
+            f"Structured snippet extension {ad_extension_id} updated"
+            if not errors
+            else "Update failed"
+        ),
         ids=[str(ad_extension_id)],
         partial_errors=errors,
     )

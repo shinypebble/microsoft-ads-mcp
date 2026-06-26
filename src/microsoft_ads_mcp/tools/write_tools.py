@@ -678,6 +678,63 @@ def register(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def add_structured_snippet_extension(
+        header: str,
+        values: list[str],
+        entity_id: str | None = None,
+        association_type: str = "Campaign",
+    ) -> MutationResult:
+        """Create a structured snippet extension and optionally attach it to a campaign/ad group.
+
+        A structured snippet is a header followed by a short list of values (e.g. header "Brands"
+        with values ["Acme", "Globex", "Initech"]).
+
+        Args:
+            header: The snippet header. Must be one of Microsoft's predefined headers (e.g.
+                "Amenities", "Brands", "Courses", "Degree programs", "Destinations",
+                "Featured hotels", "Insurance coverage", "Languages", "Models", "Neighborhoods",
+                "Service catalog", "Shows", "Styles", "Types"); an unrecognized header is rejected.
+            values: 3 to 10 snippet values, each shown after the header (max 25 chars each).
+            entity_id: Campaign or ad group id to associate it with (omit to create unattached).
+            association_type: "Campaign" or "AdGroup" (default "Campaign").
+        """
+        return guarded(
+            lambda: extensions.add_structured_snippet_extension(
+                get_client(),
+                header=header,
+                values=values,
+                entity_id=entity_id,
+                association_type=association_type,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def update_structured_snippet_extension(
+        ad_extension_id: str,
+        header: str | None = None,
+        values: list[str] | None = None,
+    ) -> MutationResult:
+        """Update an existing structured snippet extension in place (edit its header or values).
+
+        Microsoft replaces the whole snippet on update, so the header and values are always
+        required; when you omit either (e.g. to change only the values) this tool fetches the
+        current extension and re-sends the other, so a partial update is safe.
+
+        Args:
+            ad_extension_id: The structured snippet extension id (from get_ad_extensions).
+            header: New header from Microsoft's predefined list (omit to keep the current one).
+            values: New list of 3 to 10 values, max 25 chars each (omit to keep the current ones).
+        """
+        return guarded(
+            lambda: extensions.update_structured_snippet_extension(
+                get_client(),
+                ad_extension_id=ad_extension_id,
+                header=header,
+                values=values,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
     def add_call_extension(
         phone_number: str,
         country_code: str = "US",

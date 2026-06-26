@@ -437,13 +437,16 @@ class AdExtensionSummary(BaseModel):
     # Whether the extension shows only the phone number (the UI's "Show just my phone number" /
     # call-only mobile format). null for non-call extensions.
     is_call_only: bool | None = None
-    # Callout / structured snippet
+    # Callout
     text: str | None = None
     # Sitelink. Microsoft requires the two description lines to be set together (both or neither).
     display_text: str | None = None
     final_url: str | None = None
     description1: str | None = None
     description2: str | None = None
+    # Structured snippet: a header plus 3-10 short values shown after it.
+    header: str | None = None
+    values: list[str] | None = None
 
     @classmethod
     def from_sdk(cls, ext: Any) -> AdExtensionSummary:
@@ -460,6 +463,8 @@ class AdExtensionSummary(BaseModel):
             final_url=_first_final_url(ext),
             description1=_get(ext, "Description1", "description1"),
             description2=_get(ext, "Description2", "description2"),
+            header=_get(ext, "Header", "header"),
+            values=_get(ext, "Values", "values"),
         )
 
 

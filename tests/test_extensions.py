@@ -386,6 +386,123 @@ def test_get_ad_extensions_surfaces_sitelink_descriptions() -> None:
     assert out[0].description1 == "On all orders" and out[0].description2 == "No minimum spend"
 
 
+def test_add_structured_snippet_extension_carries_header_and_values() -> None:
+    # The gap: structured snippets were the one extension type with no create/update path.
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(
+                ad_extension_identities=[SimpleNamespace(id="81")], nested_partial_errors=[]
+            )
+        ]
+    )
+    result = extensions.add_structured_snippet_extension(
+        client, header="Brands", values=["Acme", "Globex", "Initech"]
+    )
+    assert result.ok and result.ids == ["81"]
+    ext = client.calls[0][2].ad_extensions[0]
+    assert ext.type == "StructuredSnippetAdExtension"
+    assert ext.header == "Brands" and ext.values == ["Acme", "Globex", "Initech"]
+
+
+def test_add_structured_snippet_extension_rejects_too_few_values() -> None:
+    # Microsoft requires 3-10 values; fewer than 3 is rejected server-side, so catch it locally.
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="3 to 10"):
+        extensions.add_structured_snippet_extension(
+            client, header="Brands", values=["Acme", "Globex"]
+        )
+    assert client.calls == []  # never reaches the API
+
+
+def test_add_structured_snippet_extension_truncates_values_to_25_chars() -> None:
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(
+                ad_extension_identities=[SimpleNamespace(id="82")], nested_partial_errors=[]
+            )
+        ]
+    )
+    long = "x" * 40
+    result = extensions.add_structured_snippet_extension(
+        client, header="Types", values=[long, "Standard", "Premium"]
+    )
+    assert result.ok
+    ext = client.calls[0][2].ad_extensions[0]
+    assert ext.values[0] == "x" * 25
+
+
+def test_update_structured_snippet_extension_merges_required_fields() -> None:
+    # Changing only the values must re-send the existing header (Microsoft replaces the whole
+    # object), so the service first GETs the snippet, then updates the merge.
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(
+                ad_extensions=[
+                    SimpleNamespace(
+                        id="81",
+                        type="StructuredSnippetAdExtension",
+                        header="Brands",
+                        values=["Acme", "Globex", "Initech"],
+                    )
+                ]
+            ),
+            SimpleNamespace(nested_partial_errors=[]),
+        ]
+    )
+    result = extensions.update_structured_snippet_extension(
+        client, ad_extension_id="81", values=["Acme", "Globex", "Umbrella", "Stark"]
+    )
+    assert result.ok and result.ids == ["81"]
+    assert [c[1] for c in client.calls] == ["get_ad_extensions_by_ids", "update_ad_extensions"]
+    ext = client.calls[1][2].ad_extensions[0]
+    assert ext.id == "81" and ext.type == "StructuredSnippetAdExtension"
+    # Header is merged from the fetched snippet rather than nulled.
+    assert ext.header == "Brands"
+    assert ext.values == ["Acme", "Globex", "Umbrella", "Stark"]
+
+
+def test_update_structured_snippet_extension_skips_fetch_when_all_fields_supplied() -> None:
+    client = _ScriptedClient([SimpleNamespace(nested_partial_errors=[])])
+    result = extensions.update_structured_snippet_extension(
+        client, ad_extension_id="81", header="Types", values=["Sedan", "SUV", "Truck"]
+    )
+    assert result.ok
+    assert [c[1] for c in client.calls] == ["update_ad_extensions"]
+
+
+def test_update_structured_snippet_extension_reports_missing_extension() -> None:
+    # Omit the header so the service must fetch (and discover the extension is gone) before update.
+    client = _ScriptedClient([SimpleNamespace(ad_extensions=[])])
+    result = extensions.update_structured_snippet_extension(
+        client, ad_extension_id="999", values=["A", "B", "C"]
+    )
+    assert not result.ok and "not found" in result.message
+    assert [c[1] for c in client.calls] == ["get_ad_extensions_by_ids"]
+
+
+def test_get_ad_extensions_surfaces_snippet_header_and_values() -> None:
+    # Read was only partial before: the compact schema had no header/values, so a snippet's
+    # content was invisible. It must be readable to confirm what was set.
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(ad_extension_ids=["81"]),
+            SimpleNamespace(
+                ad_extensions=[
+                    SimpleNamespace(
+                        id="81",
+                        type="StructuredSnippetAdExtension",
+                        status="Active",
+                        header="Brands",
+                        values=["Acme", "Globex", "Initech"],
+                    )
+                ]
+            ),
+        ]
+    )
+    out = extensions.get_ad_extensions(client, association_type="Account")
+    assert out[0].header == "Brands" and out[0].values == ["Acme", "Globex", "Initech"]
+
+
 def test_delete_ad_extensions_reports_count() -> None:
     client = _ScriptedClient([SimpleNamespace(partial_errors=[])])
     result = extensions.delete_ad_extensions(client, ad_extension_ids=["8246425030221"])

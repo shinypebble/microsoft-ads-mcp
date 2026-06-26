@@ -225,13 +225,21 @@ and `shortfall`. Every value is a modeled estimate and may be `null` where Micro
 - *Negative keywords* — `add_negative_keywords`, `remove_negative_keywords` (campaign or ad-group
   scope).
 - *Ad extensions* — `add_call_extension`, `update_call_extension`, `add_callout_extension`,
-  `add_sitelink_extension`, `delete_ad_extension`. Call extensions accept
+  `add_sitelink_extension`, `update_sitelink_extension`, `add_structured_snippet_extension`,
+  `update_structured_snippet_extension`, `delete_ad_extension`. Call extensions accept
   `is_call_tracking_enabled` (US/UK) to turn on Microsoft call tracking so call-from-ad
   conversions are measured — pass it on `add_call_extension`, or flip it on an existing asset
   with `update_call_extension`. New forwarding numbers are local (toll-free is no longer
   provisioned). They also accept `is_call_only` (the "Show just my phone number" call-only mobile
-  format). `get_ad_extensions` surfaces the current `is_call_tracking_enabled` and `is_call_only`
-  flags.
+  format). Sitelinks carry the two `description1` / `description2` lines (set both or neither);
+  structured snippets carry a `header` from Microsoft's predefined list (e.g. "Brands", "Services",
+  "Types") plus 3-10 short `values`. The `update_sitelink_extension` /
+  `update_structured_snippet_extension` tools edit those in place (e.g. add descriptions to an
+  existing sitelink), re-sending the replace-required fields for you so a partial edit is safe.
+  `delete_ad_extension` removes any extension type by id — it deletes the account-level object
+  itself, not just a single campaign/ad-group association. `get_ad_extensions` surfaces the current
+  `is_call_tracking_enabled` / `is_call_only` flags, sitelink descriptions, and snippet
+  header/values.
 - *Conversion goals / UET tags* — `create_conversion_goal` adds a goal: an `OfflineConversion`
   goal (keyed by MSCLKID, no UET tag) or a UET-backed web goal (`Url` / `Event` / `Duration` /
   `PagesViewedPerVisit`, which need a `tag_id`). Goals are created **active** (a goal doesn't spend;
@@ -291,7 +299,7 @@ src/microsoft_ads_mcp/
     campaigns.py       # hierarchy + list reads
     mutations.py       # create/update/delete for campaigns, ad groups, ads, keywords
     negatives.py       # negative-keyword add/list/remove
-    extensions.py      # ad extensions (call/callout/sitelink)
+    extensions.py      # ad extensions (call/callout/sitelink/structured snippet)
     conversions.py     # conversion goals + UET tags
     criteria.py        # location (ZIP/geo) targeting via campaign criterions
     geo.py             # ZIP -> LocationId resolution (cached geo-locations file)
