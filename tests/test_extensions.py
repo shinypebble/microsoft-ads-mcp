@@ -226,6 +226,166 @@ def test_add_call_extension_sets_discriminator_and_associates() -> None:
     assert ext.type == "CallAdExtension" and ext.phone_number == "2065550100"
 
 
+def test_add_sitelink_extension_carries_descriptions() -> None:
+    # The bug report: sitelinks must support description lines, not just display_text + final_url.
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(
+                ad_extension_identities=[SimpleNamespace(id="77")], nested_partial_errors=[]
+            )
+        ]
+    )
+    result = extensions.add_sitelink_extension(
+        client,
+        display_text="Free Shipping",
+        final_url="https://example.com/ship",
+        description1="On all orders",
+        description2="No minimum spend",
+    )
+    assert result.ok and result.ids == ["77"]
+    ext = client.calls[0][2].ad_extensions[0]
+    assert ext.type == "SitelinkAdExtension"
+    assert ext.description1 == "On all orders" and ext.description2 == "No minimum spend"
+
+
+def test_add_sitelink_extension_omits_descriptions_when_unset() -> None:
+    # Descriptions are optional; omitting them must not send empty strings (Microsoft rejects a
+    # lone description, and "" is not the same as unset).
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(
+                ad_extension_identities=[SimpleNamespace(id="78")], nested_partial_errors=[]
+            )
+        ]
+    )
+    result = extensions.add_sitelink_extension(
+        client, display_text="Contact", final_url="https://example.com/contact"
+    )
+    assert result.ok
+    ext = client.calls[0][2].ad_extensions[0]
+    assert ext.description1 is None and ext.description2 is None
+
+
+def test_add_sitelink_extension_rejects_lone_description() -> None:
+    # Microsoft requires both description lines or neither; a one-sided payload is rejected
+    # server-side, so validate locally before spending an API call.
+    client = _ScriptedClient([])
+    with pytest.raises(ValueError, match="set together"):
+        extensions.add_sitelink_extension(
+            client,
+            display_text="Contact",
+            final_url="https://example.com/contact",
+            description1="Only one line",
+        )
+    assert client.calls == []  # never reaches the API
+
+
+def test_update_sitelink_extension_rejects_lone_description_after_merge() -> None:
+    # Adding a single description to a sitelink that has none resolves to a one-sided payload
+    # even after the backfill, so the pairing check must run *after* the fetch.
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(
+                ad_extensions=[
+                    SimpleNamespace(
+                        id="56",
+                        type="SitelinkAdExtension",
+                        display_text="Free Shipping",
+                        final_urls=["https://example.com/ship"],
+                    )
+                ]
+            ),
+        ]
+    )
+    with pytest.raises(ValueError, match="set together"):
+        extensions.update_sitelink_extension(
+            client, ad_extension_id="56", description1="Only one line"
+        )
+    # The fetch happens (to attempt the merge) but the update is never sent.
+    assert [c[1] for c in client.calls] == ["get_ad_extensions_by_ids"]
+
+
+def test_update_sitelink_extension_merges_required_fields() -> None:
+    # Adding only descriptions must re-send the existing display_text + final_url (Microsoft
+    # replaces the whole object), so the service first GETs the sitelink, then updates the merge.
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(
+                ad_extensions=[
+                    SimpleNamespace(
+                        id="56",
+                        type="SitelinkAdExtension",
+                        display_text="Free Shipping",
+                        final_urls=["https://example.com/ship"],
+                    )
+                ]
+            ),
+            SimpleNamespace(nested_partial_errors=[]),
+        ]
+    )
+    result = extensions.update_sitelink_extension(
+        client,
+        ad_extension_id="56",
+        description1="On all orders",
+        description2="No minimum spend",
+    )
+    assert result.ok and result.ids == ["56"]
+    assert [c[1] for c in client.calls] == ["get_ad_extensions_by_ids", "update_ad_extensions"]
+    ext = client.calls[1][2].ad_extensions[0]
+    assert ext.id == "56" and ext.type == "SitelinkAdExtension"
+    # Display text / final URL are merged from the fetched sitelink rather than nulled.
+    assert ext.display_text == "Free Shipping" and ext.final_urls == ["https://example.com/ship"]
+    assert ext.description1 == "On all orders" and ext.description2 == "No minimum spend"
+
+
+def test_update_sitelink_extension_skips_fetch_when_all_fields_supplied() -> None:
+    # All replace-required fields given -> no fetch, single update call.
+    client = _ScriptedClient([SimpleNamespace(nested_partial_errors=[])])
+    result = extensions.update_sitelink_extension(
+        client,
+        ad_extension_id="56",
+        display_text="New Text",
+        final_url="https://example.com/new",
+        description1="Line one",
+        description2="Line two",
+    )
+    assert result.ok
+    assert [c[1] for c in client.calls] == ["update_ad_extensions"]
+
+
+def test_update_sitelink_extension_reports_missing_extension() -> None:
+    client = _ScriptedClient([SimpleNamespace(ad_extensions=[])])
+    result = extensions.update_sitelink_extension(
+        client, ad_extension_id="999", description1="x", description2="y"
+    )
+    assert not result.ok and "not found" in result.message
+    assert [c[1] for c in client.calls] == ["get_ad_extensions_by_ids"]
+
+
+def test_get_ad_extensions_surfaces_sitelink_descriptions() -> None:
+    # Descriptions must be readable, not just settable, so a configured sitelink can be confirmed.
+    client = _ScriptedClient(
+        [
+            SimpleNamespace(ad_extension_ids=["56"]),
+            SimpleNamespace(
+                ad_extensions=[
+                    SimpleNamespace(
+                        id="56",
+                        type="SitelinkAdExtension",
+                        status="Active",
+                        display_text="Free Shipping",
+                        final_urls=["https://example.com/ship"],
+                        description1="On all orders",
+                        description2="No minimum spend",
+                    )
+                ]
+            ),
+        ]
+    )
+    out = extensions.get_ad_extensions(client, association_type="Account")
+    assert out[0].description1 == "On all orders" and out[0].description2 == "No minimum spend"
+
+
 def test_delete_ad_extensions_reports_count() -> None:
     client = _ScriptedClient([SimpleNamespace(partial_errors=[])])
     result = extensions.delete_ad_extensions(client, ad_extension_ids=["8246425030221"])

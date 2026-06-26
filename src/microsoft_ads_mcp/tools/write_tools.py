@@ -614,6 +614,8 @@ def register(mcp: FastMCP) -> None:
     def add_sitelink_extension(
         display_text: str,
         final_url: str,
+        description1: str | None = None,
+        description2: str | None = None,
         entity_id: str | None = None,
         association_type: str = "Campaign",
     ) -> MutationResult:
@@ -622,6 +624,10 @@ def register(mcp: FastMCP) -> None:
         Args:
             display_text: Sitelink link text (max 25 chars).
             final_url: Landing page URL for the sitelink.
+            description1: First description line shown under the link (max 35 chars). Microsoft
+                requires both description lines together, so pass description1 and description2 as
+                a pair or omit both.
+            description2: Second description line (max 35 chars); see description1.
             entity_id: Campaign or ad group id to associate it with (omit to create unattached).
             association_type: "Campaign" or "AdGroup" (default "Campaign").
         """
@@ -630,8 +636,44 @@ def register(mcp: FastMCP) -> None:
                 get_client(),
                 display_text=display_text,
                 final_url=final_url,
+                description1=description1,
+                description2=description2,
                 entity_id=entity_id,
                 association_type=association_type,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def update_sitelink_extension(
+        ad_extension_id: str,
+        display_text: str | None = None,
+        final_url: str | None = None,
+        description1: str | None = None,
+        description2: str | None = None,
+    ) -> MutationResult:
+        """Update an existing sitelink extension in place (e.g. add or edit its descriptions).
+
+        Microsoft replaces the whole sitelink on update, so display text and the final URL are
+        always required; when you omit any field (e.g. to add only descriptions to an existing
+        sitelink) this tool fetches the current extension and re-sends it, so a partial update is
+        safe. Microsoft requires the two description lines together — a sitelink with description1
+        must also have description2.
+
+        Args:
+            ad_extension_id: The sitelink extension id (from get_ad_extensions).
+            display_text: New link text, max 25 chars (omit to keep the current one).
+            final_url: New landing page URL (omit to keep the current one).
+            description1: First description line, max 35 chars (omit to keep current).
+            description2: Second description line, max 35 chars (omit to keep current).
+        """
+        return guarded(
+            lambda: extensions.update_sitelink_extension(
+                get_client(),
+                ad_extension_id=ad_extension_id,
+                display_text=display_text,
+                final_url=final_url,
+                description1=description1,
+                description2=description2,
             )
         )
 

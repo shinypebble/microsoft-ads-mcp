@@ -439,9 +439,11 @@ class AdExtensionSummary(BaseModel):
     is_call_only: bool | None = None
     # Callout / structured snippet
     text: str | None = None
-    # Sitelink
+    # Sitelink. Microsoft requires the two description lines to be set together (both or neither).
     display_text: str | None = None
     final_url: str | None = None
+    description1: str | None = None
+    description2: str | None = None
 
     @classmethod
     def from_sdk(cls, ext: Any) -> AdExtensionSummary:
@@ -456,6 +458,8 @@ class AdExtensionSummary(BaseModel):
             text=_get(ext, "Text", "text"),
             display_text=_get(ext, "DisplayText", "display_text"),
             final_url=_first_final_url(ext),
+            description1=_get(ext, "Description1", "description1"),
+            description2=_get(ext, "Description2", "description2"),
         )
 
 

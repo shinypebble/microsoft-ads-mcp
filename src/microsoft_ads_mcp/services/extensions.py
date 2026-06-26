@@ -1,9 +1,10 @@
-"""Ad-extension flows: list extensions, update a call extension, add callout/sitelink.
+"""Ad-extension flows: list extensions, update a call/sitelink extension, add callout/sitelink.
 
 Extensions are account-level objects that get *associated* to a campaign or ad group. Adding a
 new extension is therefore two steps: create it (``add_ad_extensions``) then associate it
 (``set_ad_extensions_associations``). Updating an existing one (e.g. a call extension's phone
-number) is a single in-place ``update_ad_extensions`` and needs no re-association.
+number or a sitelink's descriptions) is a single in-place ``update_ad_extensions`` and needs no
+re-association.
 """
 
 from __future__ import annotations
@@ -144,15 +145,19 @@ def get_ad_extensions(
     return [AdExtensionSummary.from_sdk(e) for e in items if e is not None]
 
 
-def _get_call_extension(client: MsAdsClient, ad_extension_id: str) -> Any:
-    """Fetch a single call extension by id (or None) so an update can merge required fields."""
+def _get_extension(client: MsAdsClient, ad_extension_id: str, type_name: str) -> Any:
+    """Fetch a single extension by id (or None) so an update can merge required fields.
+
+    ``type_name`` is a friendly type (e.g. "Call", "Sitelink"); a Microsoft update replaces the
+    whole object, so the in-place update flows re-read the current entity to keep omitted fields.
+    """
     resp = client.call(
         CAMPAIGN,
         "get_ad_extensions_by_ids",
         GetAdExtensionsByIdsRequest(
             account_id=client.account_id,
             ad_extension_ids=[ad_extension_id],
-            ad_extension_type=_type_filter(["Call"]),
+            ad_extension_type=_type_filter([type_name]),
         ),
     )
     items = as_list(first_attr(resp, "AdExtensions", "ad_extensions"))
@@ -177,7 +182,7 @@ def update_call_extension(
     ``phone_number`` / ``country_code`` whenever the caller leaves them out.
     """
     if phone_number is None or country_code is None:
-        existing = _get_call_extension(client, ad_extension_id)
+        existing = _get_extension(client, ad_extension_id, "Call")
         if existing is None:
             return MutationResult(
                 ok=False,
@@ -273,14 +278,98 @@ def add_sitelink_extension(
     *,
     display_text: str,
     final_url: str,
+    description1: str | None = None,
+    description2: str | None = None,
     entity_id: str | None = None,
     association_type: str = "Campaign",
 ) -> MutationResult:
-    """Create a sitelink extension and optionally associate it to a campaign or ad group."""
-    ext = SitelinkAdExtension(
-        type="SitelinkAdExtension", display_text=display_text[:25], final_urls=[final_url]
-    )
+    """Create a sitelink extension and optionally associate it to a campaign or ad group.
+
+    Microsoft requires the two description lines to be set together (both or neither), so pass
+    ``description1`` and ``description2`` as a pair or omit both.
+    """
+    if (description1 is None) != (description2 is None):
+        raise ValueError(
+            "Sitelink descriptions must be set together: pass both description1 and "
+            "description2, or omit both."
+        )
+    fields: dict[str, Any] = {
+        "type": "SitelinkAdExtension",
+        "display_text": display_text[:25],
+        "final_urls": [final_url],
+    }
+    if description1 is not None:
+        fields["description1"] = description1[:35]
+    if description2 is not None:
+        fields["description2"] = description2[:35]
+    ext = SitelinkAdExtension(**fields)
     return _add_and_associate(client, ext, entity_id, association_type, "Sitelink extension")
+
+
+def update_sitelink_extension(
+    client: MsAdsClient,
+    *,
+    ad_extension_id: str,
+    display_text: str | None = None,
+    final_url: str | None = None,
+    description1: str | None = None,
+    description2: str | None = None,
+) -> MutationResult:
+    """Update an existing sitelink extension in place (e.g. add or edit its descriptions).
+
+    Microsoft's update *replaces* the whole SitelinkAdExtension, so display text and the final URL
+    are required on every update and any omitted optional field (the two descriptions) would be
+    nulled. To honor the "only the fields you pass change" contract, whenever a field is omitted
+    this fetches the current sitelink and re-sends its existing value. Microsoft also requires the
+    two descriptions to be set together: a sitelink with description1 must also have description2.
+    """
+    if display_text is None or final_url is None or description1 is None or description2 is None:
+        existing = _get_extension(client, ad_extension_id, "Sitelink")
+        if existing is None:
+            return MutationResult(
+                ok=False,
+                message=f"Sitelink extension {ad_extension_id} not found",
+                ids=[],
+                partial_errors=[f"Sitelink extension {ad_extension_id} not found"],
+            )
+        current = AdExtensionSummary.from_sdk(existing)
+        if display_text is None:
+            display_text = current.display_text
+        if final_url is None:
+            final_url = current.final_url
+        if description1 is None:
+            description1 = current.description1
+        if description2 is None:
+            description2 = current.description2
+
+    if (description1 is None) != (description2 is None):
+        raise ValueError(
+            "Sitelink descriptions must be set together: provide both description1 and "
+            "description2 (the existing sitelink has only one of them)."
+        )
+
+    fields: dict[str, Any] = {}
+    if display_text is not None:
+        fields["display_text"] = display_text[:25]
+    if final_url is not None:
+        fields["final_urls"] = [final_url]
+    if description1 is not None:
+        fields["description1"] = description1[:35]
+    if description2 is not None:
+        fields["description2"] = description2[:35]
+    ext = SitelinkAdExtension(id=ad_extension_id, type="SitelinkAdExtension", **fields)
+    resp = client.call(
+        CAMPAIGN,
+        "update_ad_extensions",
+        UpdateAdExtensionsRequest(account_id=client.account_id, ad_extensions=[ext]),
+    )
+    errors = nested_partial_errors(resp)
+    return MutationResult(
+        ok=not errors,
+        message=f"Sitelink extension {ad_extension_id} updated" if not errors else "Update failed",
+        ids=[str(ad_extension_id)],
+        partial_errors=errors,
+    )
 
 
 def add_call_extension(
