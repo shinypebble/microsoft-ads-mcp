@@ -1,0 +1,50 @@
+src/microsoft_ads_mcp/services/extensions.py
+  s_c4d52022ae91cd::t_bc4b134d536449 291-295
+  s_e095b7a7d452da::t_092bb106c64c77 185
+  s_e095b7a7d452da::t_98ebb5b2da4257 148-153,160
+  s_e095b7a7d452da::t_5743a08927d4de 281-282,286-290,296-305,309-344,351-372
+  s_e095b7a7d452da::t_305eb487468c26 1,6-7
+  s_c4d52022ae91cd::t_3d8f5086d41b48 345-350
+  s_e095b7a7d452da::t_9bd809d4b17fc6 373-374
+tests/test_extensions.py
+  s_e095b7a7d452da::t_2ee8f400e78677 229-268,308-388
+  s_c4d52022ae91cd::t_5ecaa9900defe0 269-307
+src/microsoft_ads_mcp/domain/entities.py
+  s_e095b7a7d452da::t_7bc04dd97c2bc1 442,445-446,461-462
+tests/test_read_only_gating.py
+  s_e095b7a7d452da::t_a26753f6eab3c2 29
+src/microsoft_ads_mcp/server.py
+  s_e095b7a7d452da::t_71611dc7a58bcd 71-72
+src/microsoft_ads_mcp/tools/write_tools.py
+  s_e095b7a7d452da::t_5b37b013768680 617-618,627-630,639-640,646-676
+  s_e095b7a7d452da::t_afa8e7427773c5 677-679
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "63513378364b5c871206153c381402386d1772fb",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_c4d52022ae91cd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ef09d1f-e7c1-4ddd-a71e-73ba1f515098",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    },
+    "s_e095b7a7d452da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7a25975b-ecb3-4edf-b9b4-926e10800d55",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
