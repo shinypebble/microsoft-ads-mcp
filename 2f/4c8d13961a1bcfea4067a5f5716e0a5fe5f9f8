@@ -1,0 +1,24 @@
+uv.lock
+  s_dd5972c524dbf2::t_ca72882c9b5feb 606
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "2f4c8d13961a1bcfea4067a5f5716e0a5fe5f9f8",
+  "prompts": {},
+  "humans": {
+    "h_f59d9e9062174a": {
+      "author": "coreylane <corey@garbanzomedia.com>"
+    }
+  },
+  "sessions": {
+    "s_dd5972c524dbf2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "edf05cf3-2d3a-4a69-8abb-4ceeeb339fb4",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "coreylane <corey@garbanzomedia.com>"
+    }
+  }
+}
