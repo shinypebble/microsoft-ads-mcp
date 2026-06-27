@@ -34,6 +34,7 @@ from ..services import (
     extensions,
     mutations,
     negatives,
+    sites,
 )
 from ._common import guarded
 
@@ -550,6 +551,42 @@ def register(mcp: FastMCP) -> None:
                 entity_id=entity_id,
                 entity_type=entity_type,
                 keyword_ids=keyword_ids,
+            )
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def add_website_exclusions(campaign_id: str, urls: list[str]) -> MutationResult:
+        """Block websites / mobile-app ids on a campaign so ads won't serve there.
+
+        Additive: new sites are merged with the campaign's existing exclusions (read-modify-write),
+        so this never clobbers what's already blocked. Pass bare domains or paths (e.g.
+        "example.com", "example.com/section") or mobile-app ids; a leading http(s):// is stripped
+        for you. Microsoft sites (e.g. MSN.com) can't be excluded and there's a ~2500-site cap per
+        campaign -- such rejections come back in partial_errors. View with get_website_exclusions.
+
+        Args:
+            campaign_id: The campaign id to block sites on.
+            urls: Websites / app ids to block (referrer domains).
+        """
+        return guarded(
+            lambda: sites.add_website_exclusions(get_client(), campaign_id=campaign_id, urls=urls)
+        )
+
+    @mcp.tool(tags={"write"}, annotations=_WRITE)
+    def remove_website_exclusions(campaign_id: str, urls: list[str]) -> MutationResult:
+        """Unblock previously excluded websites / app ids on a campaign (matched by URL).
+
+        Read-modify-write: the named sites are filtered out and the rest are re-set, so other
+        exclusions are retained. Removal is by URL (case-insensitive), not by id. List the current
+        exclusions first with get_website_exclusions.
+
+        Args:
+            campaign_id: The campaign id the sites are blocked on.
+            urls: The websites / app ids to unblock.
+        """
+        return guarded(
+            lambda: sites.remove_website_exclusions(
+                get_client(), campaign_id=campaign_id, urls=urls
             )
         )
 

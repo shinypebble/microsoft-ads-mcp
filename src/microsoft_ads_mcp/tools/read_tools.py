@@ -26,6 +26,7 @@ from ..domain.entities import (
     NegativeKeywordSummary,
     PostalCodeLocation,
     UetTagSummary,
+    WebsiteExclusionSummary,
 )
 from ..services import (
     account_properties,
@@ -37,6 +38,7 @@ from ..services import (
     extensions,
     geo,
     negatives,
+    sites,
     url_resolution,
 )
 from ._common import guarded
@@ -158,6 +160,18 @@ def register(mcp: FastMCP) -> None:
                 parent_entity_id=parent_entity_id,
             )
         )
+
+    @mcp.tool(tags={"read"}, annotations=_READ)
+    def get_website_exclusions(campaign_id: str) -> WebsiteExclusionSummary:
+        """List the website / mobile-app-id exclusions (negative sites) blocked on a campaign.
+
+        These prevent ads from serving on the listed sites/apps. Add or remove them with
+        add_website_exclusions / remove_website_exclusions.
+
+        Args:
+            campaign_id: The campaign id.
+        """
+        return guarded(lambda: sites.get_website_exclusions(get_client(), campaign_id=campaign_id))
 
     @mcp.tool(tags={"read"}, annotations=_READ)
     def get_ad_extensions(

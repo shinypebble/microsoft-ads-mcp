@@ -422,6 +422,18 @@ class NegativeKeywordSummary(BaseModel):
         )
 
 
+class WebsiteExclusionSummary(BaseModel):
+    """The website / mobile-app-id exclusions (negative sites) blocked on a campaign.
+
+    Microsoft models these as a flat list of URL strings per campaign (no per-site id), so removal
+    is by URL, not by id. ``count`` is ``len(urls)``, surfaced for convenience.
+    """
+
+    campaign_id: str | None = None
+    urls: list[str] = []
+    count: int = 0
+
+
 class AdExtensionSummary(BaseModel):
     """Compact, type-spanning view of an ad extension (call, callout, sitelink, ...)."""
 

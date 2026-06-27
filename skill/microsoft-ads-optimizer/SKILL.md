@@ -64,6 +64,9 @@ write tool doesn't turn up, confirm `account_health.read_only` before assuming i
   `"keyword"` for quality-score and CTR triage, and `"geographic"` for location performance.
   Pass `start_date`/`end_date` ("YYYY-MM-DD") for a custom window and `campaign_id`/`ad_group_id`
   to scope to one entity (e.g. confirm a repointed URL is serving for one campaign).
+- `get_website_exclusions(campaign_id)` lists the websites / mobile-app ids blocked on a campaign
+  (Microsoft's "website control list" exclusions / negative sites) — the referrer domains where ads
+  won't serve.
 - `get_negative_keywords`, `get_ad_extensions`, `get_conversion_goals`, `get_uet_tags`, and
   `get_location_targets(campaign_id)` read the rest of the model. `get_conversion_goals` now
   reports each goal's `exclude_from_bidding` (the inverse of "Include in conversions" — whether the
@@ -142,6 +145,14 @@ data — treat missing numbers as "unknown", not "zero".
   editing every URL.
 - Negatives: `add_negative_keywords(entity_id, keywords, entity_type)` (Campaign or AdGroup),
   `remove_negative_keywords` (by id — resolve with `get_negative_keywords` first).
+- Website exclusions (block referrer domains at the campaign level):
+  `add_website_exclusions(campaign_id, urls)` blocks websites / mobile-app ids so ads won't serve
+  there, and `remove_website_exclusions(campaign_id, urls)` unblocks them (matched by URL). Both are
+  **additive read-modify-write** wrappers over Microsoft's replace-all `SetNegativeSitesToCampaigns`,
+  so adding never clobbers the campaign's existing exclusions and removing keeps the rest. Pass bare
+  domains/paths or app ids (a leading `http(s)://` is stripped). Microsoft sites (e.g. MSN.com) can't
+  be excluded and there's a ~2500-site/campaign cap — those rejections come back in `partial_errors`.
+  Read the current list first with `get_website_exclusions`.
 - Extensions: `add_call_extension` / `add_callout_extension` / `add_sitelink_extension`
   create-and-associate to a campaign/ad group; `update_call_extension(ad_extension_id,
   phone_number=..., country_code="US")` edits one in place; `delete_ad_extension(ids)` removes
